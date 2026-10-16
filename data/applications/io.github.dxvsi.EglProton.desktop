@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Proton for Epic
+Name[ru]=Proton для Epic
+Comment=Choose which Proton runs Epic Games Launcher games
+Comment[ru]=Выбор Proton для игр Epic Games Launcher
+Exec=egl-proton
+Icon=applications-games
+Terminal=false
+Categories=Game;
+Keywords=proton;wine;epic;
+StartupNotify=true

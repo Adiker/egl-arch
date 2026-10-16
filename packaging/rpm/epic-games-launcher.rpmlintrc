@@ -1,0 +1,11 @@
+# Замечания к бинарникам Epic, которые пакет ставит без изменений.
+addFilter(r"unstripped-binary-or-object /usr/bin/EpicGamesLauncher")
+addFilter(r"invalid-soname /usr/lib/libEOSSDK-Linux-Shipping\.so")
+addFilter(r"binary-or-shlib-defines-rpath /usr/lib/epic-games-launcher/libEOSSDK-Linux-Shipping\.so")
+addFilter(r"binary-or-shlib-calls-gethostbyname /usr/(bin/EpicGamesLauncher|lib/(epic-games-launcher/)?libEOSSDK-Linux-Shipping\.so)")
+addFilter(r"crypto-policy-non-compliance-openssl /usr/bin/EpicGamesLauncher")
+addFilter(r"no-manual-page-for-binary EpicGamesLauncher")
+# Лицензия Epic не входит в список SPDX.
+addFilter(r"invalid-license LicenseRef-Proprietary")
+# egl-proton: графическое приложение, запускается из меню.
+addFilter(r"no-manual-page-for-binary egl-proton")

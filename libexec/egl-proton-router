@@ -1,0 +1,73 @@
+#!/bin/sh
+# Запускает игру Epic Games Launcher через Proton, выбранный в «Proton для Epic».
+#
+# Вызывается заглушкой <runtime>/proton, которую ставит egl-proton-hook:
+#   egl-proton-router <путь заглушки> <аргументы Proton>
+# Настройка: ${XDG_CONFIG_HOME:-~/.config}/egl-fedora/proton.conf
+#   default=epic | <каталог Proton>
+#   game.<app_name>=default | epic | <каталог Proton>
+# app_name берётся из имени префикса (STEAM_COMPAT_DATA_PATH).
+
+set -u
+
+stub=$1
+shift
+runtime_dir=$(dirname "$stub")
+epic_proton=$runtime_dir/proton.epic
+conf=${XDG_CONFIG_HOME:-$HOME/.config}/egl-fedora/proton.conf
+log_dir=${XDG_STATE_HOME:-$HOME/.local/state}/egl-fedora
+app_name=$(basename "${STEAM_COMPAT_DATA_PATH:-unknown}")
+
+log() {
+  mkdir -p "$log_dir" 2>/dev/null &&
+    printf '%s %s\n' "$(date -Is)" "$*" >>"$log_dir/proton.log" 2>/dev/null
+  return 0
+}
+
+# Последнее значение ключа из proton.conf.
+conf_get() {
+  [ -r "$conf" ] || return 0
+  awk -v key="$1" '
+    index($0, key "=") == 1 { value = substr($0, length(key) + 2) }
+    END { if (value != "") print value }
+  ' "$conf"
+}
+
+choice=$(conf_get "game.$app_name")
+case $choice in
+  "" | default) choice=$(conf_get default) ;;
+esac
+[ -n "$choice" ] || choice=epic
+
+if [ "$choice" != epic ]; then
+  case $choice in
+    /*)
+      if [ ! -x "$choice/proton" ]; then
+        log "app=$app_name: не найден $choice/proton, запускаю Proton от Epic"
+        choice=epic
+      fi
+      ;;
+    *)
+      log "app=$app_name: непонятное значение '$choice', запускаю Proton от Epic"
+      choice=epic
+      ;;
+  esac
+fi
+
+if [ "$choice" = epic ]; then
+  log "app=$app_name proton=epic:$(basename "$runtime_dir") verb=${1:-}"
+  exec "$epic_proton" "$@"
+fi
+
+# protonfixes ищет фиксы игры по UMU_ID и STORE, как при запуске через umu.
+# Epic их не задаёт: берём UMU_ID из базы этого Proton по app_name.
+if [ -z "${UMU_ID:-}" ] && [ -d "$choice/protonfixes" ]; then
+  umu_id=$(awk -F, -v app="$app_name" '$2 == "egs" && $3 == app { print $4; exit }' \
+    "$choice/protonfixes/umu-database.csv" 2>/dev/null)
+  UMU_ID=${umu_id:-umu-default}
+  STORE=${STORE:-egs}
+  export UMU_ID STORE
+fi
+
+log "app=$app_name proton=$choice umu_id=${UMU_ID:-} verb=${1:-}"
+exec "$choice/proton" "$@"

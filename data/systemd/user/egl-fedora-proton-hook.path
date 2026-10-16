@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch Epic Games Launcher Proton runtimes (egl-fedora)
+
+[Path]
+PathChanged=%h/.local/share/com.epicgames.eglv2/compat/runtime
+Unit=egl-fedora-proton-hook.service
+
+[Install]
+WantedBy=default.target

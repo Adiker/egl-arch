@@ -1,0 +1,7 @@
+#!/bin/sh
+# Запуск Epic Games Launcher из ярлыка и по ссылкам com.epicgames.launcher://.
+# Перед запуском ставит выбор Proton в runtime, которые Epic скачал с прошлого раза.
+# Ошибка перехвата не мешает запуску: игры тогда идут через Proton от Epic.
+
+/usr/libexec/egl-fedora/egl-proton-hook apply >/dev/null || true
+exec /usr/bin/EpicGamesLauncher "$@"

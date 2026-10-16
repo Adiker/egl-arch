@@ -1,0 +1,17 @@
+[package]
+name = "egl-proton"
+version = "1.0.0"
+edition = "2024"
+description = "Choose which Proton runs Epic Games Launcher games"
+license = "MIT"
+publish = false
+
+[dependencies]
+adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
+gtk = { package = "gtk4", version = "0.11", features = ["v4_10"] }
+serde_json = "1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = "symbols"

@@ -1,0 +1,12 @@
+[Unit]
+Description=Update Epic Games Launcher package (egl-fedora)
+Documentation=https://github.com/@UPDATE_REPO@
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/egl-fedora/egl-update
+Nice=10
+IOSchedulingClass=idle
+PrivateTmp=yes

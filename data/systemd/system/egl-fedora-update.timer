@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly Epic Games Launcher update check (egl-fedora)
+Documentation=https://github.com/@UPDATE_REPO@
+
+[Timer]
+OnActiveSec=15min
+OnUnitActiveSec=1h
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

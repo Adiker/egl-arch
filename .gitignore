@@ -1,0 +1,4 @@
+/proton-gui/target/
+/proton-gui/vendor/
+/proton-gui/.cargo/
+/build/

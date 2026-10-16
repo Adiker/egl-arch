@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# Ставит заглушку egl-fedora в каждый Proton runtime, который скачал Epic Games Launcher.
+#
+# Epic запускает игры как <runtime>/proton waitforexitandrun <exe>. Заглушка
+# передаёт вызов egl-proton-router, а оригинальный Proton от Epic лежит рядом
+# как proton.epic. Если роутер удалён вместе с пакетом, заглушка сама запускает
+# proton.epic, так что игры продолжают работать.
+#
+# Использование:
+#   egl-proton-hook apply          поставить заглушку во все готовые runtime
+#   egl-proton-hook apply --wait   то же, но дождаться runtime, которые Epic ещё распаковывает
+#   egl-proton-hook status         строки "<runtime><TAB>active|inactive|incomplete"
+
+set -euo pipefail
+
+runtime_root="$HOME/.local/share/com.epicgames.eglv2/compat/runtime"
+router="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/egl-proton-router"
+stub_marker="# egl-fedora proton stub"
+# Обёртка из ручной настройки до egl-fedora (epic-dw-proton), её переносим.
+legacy_marker="# epic-dw-proton wrapper"
+wait_limit_seconds=900
+wait_step_seconds=5
+
+case $router in
+  *"'"*) echo "egl-proton-hook: недопустимый путь роутера: $router" >&2; exit 1 ;;
+esac
+
+runtimes() {
+  local dir
+  shopt -s nullglob
+  for dir in "$runtime_root"/*/; do
+    dir=${dir%/}
+    [[ $(basename "$dir") == .* ]] && continue
+    printf '%s\n' "$dir"
+  done
+}
+
+has_marker() {
+  [[ -f $1 ]] && grep -qxF "$2" "$1"
+}
+
+stub_text() {
+  cat <<EOF
+#!/bin/sh
+$stub_marker
+# Создано egl-proton-hook. Оригинальный Proton от Epic: proton.epic рядом.
+router='$router'
+if [ -x "\$router" ]; then
+  exec "\$router" "\$0" "\$@"
+fi
+exec "\$(dirname "\$0")/proton.epic" "\$@"
+EOF
+}
+
+write_stub() {
+  local target=$1 tmp="$1.egl-fedora-tmp"
+  stub_text >"$tmp"
+  chmod 0755 "$tmp"
+  mv -f "$tmp" "$target"
+}
+
+# Готов ли runtime: Epic уже положил proton и version.
+is_ready() {
+  [[ -f $1/version && -f $1/proton ]]
+}
+
+apply_dir() {
+  local dir=$1 proton="$1/proton" original="$1/proton.epic"
+
+  if has_marker "$proton" "$stub_marker"; then
+    if [[ ! -f $original ]]; then
+      echo "egl-proton-hook: в $dir заглушка есть, а proton.epic нет; оставляю как есть" >&2
+      return 0
+    fi
+    if [[ $(stub_text) != "$(cat "$proton")" ]]; then
+      write_stub "$proton"
+    fi
+    return 0
+  fi
+
+  if has_marker "$proton" "$legacy_marker"; then
+    if [[ ! -f $dir/proton.ge-orig ]]; then
+      echo "egl-proton-hook: в $dir старая обёртка без proton.ge-orig; оставляю как есть" >&2
+      return 0
+    fi
+    mv -f "$dir/proton.ge-orig" "$original"
+  else
+    # Свежий или заново распакованный Proton от Epic.
+    mv -f "$proton" "$original"
+  fi
+  write_stub "$proton"
+  echo "egl-proton-hook: выбор Proton подключён: $dir"
+}
+
+cmd_apply() {
+  local wait=0 waited=0 dir pending
+  [[ ${1:-} == --wait ]] && wait=1
+  while :; do
+    pending=0
+    while IFS= read -r dir; do
+      if is_ready "$dir"; then
+        apply_dir "$dir"
+      else
+        pending=1
+      fi
+    done < <(runtimes)
+    ((wait && pending)) || return 0
+    if ((waited >= wait_limit_seconds)); then
+      echo "egl-proton-hook: Epic не закончил распаковку Proton за ${wait_limit_seconds} с" >&2
+      return 0
+    fi
+    sleep "$wait_step_seconds"
+    waited=$((waited + wait_step_seconds))
+  done
+}
+
+cmd_status() {
+  local dir state
+  while IFS= read -r dir; do
+    if has_marker "$dir/proton" "$stub_marker" && [[ -f $dir/proton.epic ]]; then
+      state=active
+    elif is_ready "$dir"; then
+      state=inactive
+    else
+      state=incomplete
+    fi
+    printf '%s\t%s\n' "$(basename "$dir")" "$state"
+  done < <(runtimes)
+}
+
+case "${1:-}" in
+  apply) shift; cmd_apply "$@" ;;
+  status) cmd_status ;;
+  *) echo "Использование: egl-proton-hook apply [--wait] | status" >&2; exit 2 ;;
+esac

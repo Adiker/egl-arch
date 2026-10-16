@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=Epic Games Launcher
+Comment=Epic Games Store and game library
+Comment[ru]=Магазин и библиотека игр Epic Games
+Exec=/usr/libexec/egl-fedora/egl-launch %u
+Icon=EpicGamesLauncher
+Terminal=false
+Categories=Game;
+StartupWMClass=EpicGamesLauncher
+MimeType=x-scheme-handler/com.epicgames.launcher;
+Actions=choose-proton;
+
+[Desktop Action choose-proton]
+Name=Choose Proton
+Name[ru]=Выбрать Proton
+Exec=egl-proton
