@@ -40,7 +40,7 @@ jobs:
           set -euo pipefail
           shellcheck --version
           shellcheck -s bash libexec/egl-proton-hook libexec/egl-update \
-            packaging/scripts/*.sh tests/*.sh
+            packaging/scripts/*.sh tests/*.sh tray/build.sh
           shellcheck -s sh libexec/egl-proton-router libexec/egl-launch
 
   fedora-release:
@@ -114,10 +114,14 @@ jobs:
             desktop-file-utils \
             findutils \
             gawk \
+            gcc \
             git \
+            gtk3-devel \
             gtk4-devel \
             jq \
             libadwaita-devel \
+            libayatana-appindicator-gtk3 \
+            patchelf \
             rpm-build \
             rpmlint \
             rust \

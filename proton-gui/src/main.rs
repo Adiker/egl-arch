@@ -1,4 +1,4 @@
-//! «Proton для Epic»: выбор Proton для игр Epic Games Launcher.
+//! «Epic Games: выбор Proton»: выбор Proton для игр Epic Games Launcher.
 //!
 //! Окно пишет proton.conf, а запуск выбранного Proton делает egl-proton-router.
 
@@ -70,20 +70,39 @@ struct State {
     titles: BTreeMap<String, String>,
 }
 
-/// Вариант выпадающего списка: значение для proton.conf и подпись.
+/// Вариант выпадающего списка: значение для proton.conf, название и версия.
 struct Choice {
     value: String,
-    label: String,
+    title: String,
+    detail: Option<String>,
 }
 
-fn proton_choices(installs: &[ProtonInstall], epic_label: &str) -> Vec<Choice> {
-    let mut choices = vec![Choice {
-        value: EPIC.to_owned(),
-        label: epic_label.to_owned(),
-    }];
-    choices.extend(installs.iter().map(|install| Choice {
-        value: install.dir.to_string_lossy().into_owned(),
-        label: install.label(),
+impl Choice {
+    fn new(value: &str, title: &str, detail: Option<&str>) -> Self {
+        Self {
+            value: value.to_owned(),
+            title: title.to_owned(),
+            detail: detail.map(str::to_owned),
+        }
+    }
+
+    /// Одной строкой, для подзаголовка строки с выбранным Proton.
+    fn label(&self) -> String {
+        match &self.detail {
+            Some(detail) => format!("{} ({detail})", self.title),
+            None => self.title.clone(),
+        }
+    }
+}
+
+fn proton_choices(installs: &[ProtonInstall], epic_detail: Option<&str>) -> Vec<Choice> {
+    let mut choices = vec![Choice::new(EPIC, "GE-Proton от Epic", epic_detail)];
+    choices.extend(installs.iter().map(|install| {
+        let detail = install
+            .version
+            .as_deref()
+            .filter(|version| *version != install.name);
+        Choice::new(&install.dir.to_string_lossy(), &install.name, detail)
     }));
     choices
 }
@@ -93,24 +112,92 @@ fn select_index(choices: &mut Vec<Choice>, value: &str) -> u32 {
     let index = match choices.iter().position(|choice| choice.value == value) {
         Some(index) => index,
         None => {
-            choices.push(Choice {
-                value: value.to_owned(),
-                label: format!("{value} (не найден)"),
-            });
+            choices.push(Choice::new(value, value, Some("не найден")));
             choices.len() - 1
         }
     };
     u32::try_from(index).unwrap_or(0)
 }
 
+/// Пункт списка в две строки (название и версия) без обрезки текста, с галочкой у выбранного.
+fn list_factory(choices: &[Choice]) -> gtk::SignalListItemFactory {
+    let lines: Rc<Vec<(String, Option<String>)>> = Rc::new(
+        choices
+            .iter()
+            .map(|choice| (choice.title.clone(), choice.detail.clone()))
+            .collect(),
+    );
+    let factory = gtk::SignalListItemFactory::new();
+    factory.connect_setup(|_, object| {
+        let Some(item) = object.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let title = gtk::Label::builder()
+            .xalign(0.0)
+            .wrap(true)
+            .max_width_chars(44)
+            .build();
+        let detail = gtk::Label::builder()
+            .xalign(0.0)
+            .wrap(true)
+            .max_width_chars(44)
+            .css_classes(["dim-label", "caption"])
+            .build();
+        let column = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(2)
+            .hexpand(true)
+            .build();
+        column.append(&title);
+        column.append(&detail);
+        let check = gtk::Image::from_icon_name("object-select-symbolic");
+        item.property_expression("selected")
+            .bind(&check, "visible", gtk::Widget::NONE);
+        let line = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        line.append(&column);
+        line.append(&check);
+        item.set_child(Some(&line));
+    });
+    factory.connect_bind(move |_, object| {
+        let Some(item) = object.downcast_ref::<gtk::ListItem>() else {
+            return;
+        };
+        let Some(column) = item
+            .child()
+            .and_then(|line| line.first_child())
+            .and_downcast::<gtk::Box>()
+        else {
+            return;
+        };
+        let (Some(title), Some(detail)) = (
+            column.first_child().and_downcast::<gtk::Label>(),
+            column.last_child().and_downcast::<gtk::Label>(),
+        ) else {
+            return;
+        };
+        let Some((text, extra)) = usize::try_from(item.position())
+            .ok()
+            .and_then(|index| lines.get(index))
+        else {
+            return;
+        };
+        title.set_text(text);
+        detail.set_text(extra.as_deref().unwrap_or_default());
+        detail.set_visible(extra.is_some());
+    });
+    factory
+}
+
 /// Выбранный Proton показывается подзаголовком: справа длинные названия обрезаются.
 fn combo_row(title: &str, choices: &[Choice], selected: u32) -> adw::ComboRow {
-    let labels: Vec<&str> = choices.iter().map(|choice| choice.label.as_str()).collect();
+    let labels: Vec<String> = choices.iter().map(Choice::label).collect();
+    let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
     adw::ComboRow::builder()
         .title(title)
         .use_subtitle(true)
         .use_markup(false)
         .model(&gtk::StringList::new(&labels))
+        .list_factory(&list_factory(choices))
         .selected(selected)
         .build()
 }
@@ -182,11 +269,11 @@ fn status_group(hook: &HookState) -> adw::PreferencesGroup {
 
 fn default_group(
     installs: &[ProtonInstall],
-    epic_label: &str,
+    epic_detail: Option<&str>,
     state: &Rc<RefCell<State>>,
     toasts: &adw::ToastOverlay,
 ) -> adw::PreferencesGroup {
-    let mut choices = proton_choices(installs, epic_label);
+    let mut choices = proton_choices(installs, epic_detail);
     let selected = select_index(&mut choices, &state.borrow().config.default);
     let row = combo_row("Proton для всех игр", &choices, selected);
     let values = choices.into_iter().map(|choice| choice.value).collect();
@@ -205,7 +292,7 @@ fn default_group(
 fn games_group(
     games: &[Game],
     installs: &[ProtonInstall],
-    epic_label: &str,
+    epic_detail: Option<&str>,
     state: &Rc<RefCell<State>>,
     toasts: &adw::ToastOverlay,
 ) -> adw::PreferencesGroup {
@@ -227,11 +314,8 @@ fn games_group(
     }
 
     for game in games {
-        let mut choices = vec![Choice {
-            value: DEFAULT.to_owned(),
-            label: "Как для всех игр".to_owned(),
-        }];
-        choices.extend(proton_choices(installs, epic_label));
+        let mut choices = vec![Choice::new(DEFAULT, "Как для всех игр", None)];
+        choices.extend(proton_choices(installs, epic_detail));
         let current = state
             .borrow()
             .config
@@ -330,15 +414,26 @@ fn build_page(window: &adw::ApplicationWindow, toasts: &adw::ToastOverlay) -> ad
         titles,
     }));
 
-    let epic_label = match &hook {
-        HookState::Active(runtimes) => format!("GE-Proton от Epic ({})", runtimes.join(", ")),
-        _ => "GE-Proton от Epic".to_owned(),
+    let epic_detail = match &hook {
+        HookState::Active(runtimes) => Some(runtimes.join(", ")),
+        _ => None,
     };
 
     let page = adw::PreferencesPage::new();
     page.add(&status_group(&hook));
-    page.add(&default_group(&installs, &epic_label, &state, toasts));
-    page.add(&games_group(&games, &installs, &epic_label, &state, toasts));
+    page.add(&default_group(
+        &installs,
+        epic_detail.as_deref(),
+        &state,
+        toasts,
+    ));
+    page.add(&games_group(
+        &games,
+        &installs,
+        epic_detail.as_deref(),
+        &state,
+        toasts,
+    ));
     page.add(&more_protons_group(window));
     page
 }
@@ -362,7 +457,7 @@ fn build_window(app: &adw::Application) {
 
     let window = adw::ApplicationWindow::builder()
         .application(app)
-        .title("Proton для Epic")
+        .title("Epic Games: выбор Proton")
         .default_width(680)
         .default_height(760)
         .content(&view)

@@ -12,7 +12,23 @@ trap 'rm -rf "$work"' EXIT
 export HOME="$work/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_STATE_HOME="$HOME/.local/state"
-unset UMU_ID STORE
+unset UMU_ID STORE WAYLAND_DISPLAY DISPLAY STEAM_COMPAT_INSTALL_PATH
+# Поддельные notify-send и egl-proton для проверки подсказки.
+fake_bin="$work/bin"
+mkdir -p "$fake_bin"
+cat >"$fake_bin/notify-send" <<NOTIFY
+#!/bin/sh
+for arg; do
+  case \$arg in --*) ;; *) printf '%s\n' "\$arg" >>'$work/notify.log'; break ;; esac
+done
+echo choose
+NOTIFY
+cat >"$fake_bin/egl-proton" <<OPEN
+#!/bin/sh
+: >'$work/opened'
+OPEN
+chmod 0755 "$fake_bin/notify-send" "$fake_bin/egl-proton"
+export PATH="$fake_bin:$PATH"
 runtime_root="$HOME/.local/share/com.epicgames.eglv2/compat/runtime"
 app=525aa0efd70f4399b9f64bcd2a5b38c7
 export STEAM_COMPAT_DATA_PATH="$HOME/.local/share/com.epicgames.eglv2/compat/compatdata/$app"
@@ -115,6 +131,40 @@ check "обёртка epic-dw-proton перенесена" "yes" "$(grep -q epic
 timeout 60 "$hook" apply --wait >/dev/null
 wait
 check "--wait дождался runtime" "$(printf 'GE-Proton10-34\tactive\nGE-Proton11-1\tactive\nGE-Proton9-1\tactive')" "$("$hook" status)"
+
+# Подсказка о выборе Proton: один раз на игру и только без своего выбора.
+wait_for_file() {
+  local tries=50
+  while ((tries--)); do
+    [[ -e $1 ]] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+export WAYLAND_DISPLAY=test-display
+export STEAM_COMPAT_INSTALL_PATH=/games/ZenlessZoneZero
+rm -f "$conf" "$work/notify.log" "$work/opened"
+rm -rf "$XDG_STATE_HOME/egl-fedora/hint-shown"
+run_game >/dev/null
+wait_for_file "$work/opened" || true
+check "подсказка при первом запуске" "ZenlessZoneZero запущена через GE-Proton от Epic" "$(cat "$work/notify.log" 2>/dev/null)"
+check "кнопка в подсказке открывает окно" "yes" "$([[ -e $work/opened ]] && echo yes)"
+rm -f "$work/notify.log"
+run_game >/dev/null
+sleep 1
+check "второй запуск без подсказки" "" "$(cat "$work/notify.log" 2>/dev/null)"
+printf 'default=%s\n' "$dw" >"$conf"
+rm -rf "$XDG_STATE_HOME/egl-fedora/hint-shown"
+run_game >/dev/null
+wait_for_file "$work/notify.log" || true
+check "подсказка называет Proton по умолчанию" "ZenlessZoneZero запущена через DW-Proton Latest" "$(cat "$work/notify.log" 2>/dev/null)"
+rm -f "$work/notify.log"
+printf 'game.%s=%s\n' "$app" "$dw" >"$conf"
+rm -rf "$XDG_STATE_HOME/egl-fedora/hint-shown"
+run_game >/dev/null
+sleep 1
+check "свой Proton у игры: без подсказки" "" "$(cat "$work/notify.log" 2>/dev/null)"
+unset WAYLAND_DISPLAY STEAM_COMPAT_INSTALL_PATH
 
 if ((failures)); then
   echo "Провалено проверок: $failures" >&2

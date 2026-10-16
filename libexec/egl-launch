@@ -4,4 +4,9 @@
 # Ошибка перехвата не мешает запуску: игры тогда идут через Proton от Epic.
 
 /usr/libexec/egl-fedora/egl-proton-hook apply >/dev/null || true
+
+# Подменная библиотека трея добавляет в меню трея Epic пункт «Выбрать Proton для игр»
+# (см. tray/egl-tray.c). В этом каталоге больше ничего нет.
+LD_LIBRARY_PATH=/usr/lib64/egl-fedora/tray${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH
 exec /usr/bin/EpicGamesLauncher "$@"

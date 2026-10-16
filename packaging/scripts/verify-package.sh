@@ -24,6 +24,7 @@ for path in \
   /usr/libexec/egl-fedora/egl-proton-hook \
   /usr/libexec/egl-fedora/egl-proton-router \
   /usr/libexec/egl-fedora/egl-update \
+  /usr/lib64/egl-fedora/tray/libayatana-appindicator3.so.1 \
   /usr/lib/systemd/system/egl-fedora-update.service \
   /usr/lib/systemd/system/egl-fedora-update.timer \
   /usr/lib/systemd/user/egl-fedora-proton-hook.path \
@@ -46,8 +47,20 @@ grep -q '^libEOSSDK' <<<"$(rpm -qp --provides "$rpm_file")" && fail "пакет 
 # Адрес релизов подставлен при сборке.
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-(cd "$work" && rpm2cpio "$rpm_file" | cpio -idm --quiet ./usr/libexec/egl-fedora/egl-update ./usr/lib/systemd/system/egl-fedora-update.service)
+# Через файл, а не канал: cpio закрывает вход, найдя все файлы, и rpm2cpio
+# получил бы SIGPIPE.
+rpm2cpio "$rpm_file" >"$work/payload.cpio"
+(cd "$work" && cpio -idm --quiet <payload.cpio \
+  ./usr/libexec/egl-fedora/egl-update \
+  ./usr/lib/systemd/system/egl-fedora-update.service \
+  ./usr/lib64/egl-fedora/tray/libayatana-appindicator3.so.1)
 grep -rq '@UPDATE_REPO@' "$work" && fail "не подставлен @UPDATE_REPO@"
+
+# Подменная библиотека трея: своя soname и настоящая библиотека по абсолютному пути.
+tray_dynamic=$(readelf -d "$work/usr/lib64/egl-fedora/tray/libayatana-appindicator3.so.1")
+grep -qF '[libegl-fedora-tray.so]' <<<"$tray_dynamic" || fail "у библиотеки трея не та soname"
+grep -qF '[/usr/lib64/libayatana-appindicator3.so.1]' <<<"$tray_dynamic" ||
+  fail "библиотека трея не зависит от настоящей по абсолютному пути"
 
 rpmlint -r "$repo_root/packaging/rpm/epic-games-launcher.rpmlintrc" "$rpm_file" || fail "rpmlint нашёл ошибки"
 

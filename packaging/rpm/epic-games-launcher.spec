@@ -17,7 +17,7 @@
 %global __strip         /bin/true
 
 # EOS SDK лежит внутри пакета: не объявляем его общесистемной библиотекой.
-%global __provides_exclude_from ^%{_prefix}/lib/.*\\.so$
+%global __provides_exclude_from ^(%{_prefix}/lib/.*\\.so|%{_libdir}/egl-fedora/.*)$
 %global __requires_exclude      ^libEOSSDK-Linux-Shipping\\.so
 
 Name:           %{appname}
@@ -34,20 +34,28 @@ BuildRequires:  binutils
 BuildRequires:  cargo
 BuildRequires:  desktop-file-utils
 BuildRequires:  gawk
+BuildRequires:  gcc
+BuildRequires:  gtk3-devel
 BuildRequires:  gtk4-devel
 BuildRequires:  libadwaita-devel
+BuildRequires:  libayatana-appindicator-gtk3%{?_isa}
+BuildRequires:  patchelf
 BuildRequires:  rust
 BuildRequires:  squashfs-tools
 BuildRequires:  systemd-rpm-macros
 
 Requires:       xdg-utils
 Requires:       hicolor-icon-theme
+# подменная библиотека трея подключает настоящую по абсолютному пути
+Requires:       libayatana-appindicator-gtk3%{?_isa}
 # egl-update и скрипты Proton
 Requires:       /usr/bin/dnf
 Requires:       coreutils
 Requires:       curl
 Requires:       findutils
 Requires:       gawk
+# подсказка о выборе Proton при первом запуске игры
+Requires:       /usr/bin/notify-send
 %{?systemd_requires}
 
 %description
@@ -57,7 +65,7 @@ libsoup 3.
 
 The package adds:
 - an hourly update check that installs newer packages from GitHub Releases;
-- "Proton for Epic", a window to choose which Proton (GE from Epic,
+- "Epic Games: Proton selection", a window to choose which Proton (GE from Epic,
   DW-Proton, Proton-CachyOS, Steam Proton and others) runs each game.
 
 This package is not affiliated with or endorsed by Epic Games.
@@ -81,7 +89,10 @@ if ! grep -aqF "EpicGamesLauncher/%{epic_version}+g%{epic_gitrev}" appdir/usr/bi
 fi
 
 %build
-cd %{srcname}/proton-gui
+cd %{srcname}
+%set_build_flags
+tray/build.sh tray-build
+cd proton-gui
 cargo build --release --offline --locked
 
 %install
@@ -109,6 +120,8 @@ done
 sed 's|@UPDATE_REPO@|%{update_repo}|g' libexec/egl-update >egl-update
 install -Dpm0755 egl-update %{buildroot}%{_libexecdir}/egl-fedora/egl-update
 install -Dpsm0755 proton-gui/target/release/egl-proton %{buildroot}%{_bindir}/egl-proton
+install -Dpsm0755 tray-build/libayatana-appindicator3.so.1 \
+  %{buildroot}%{_libdir}/egl-fedora/tray/libayatana-appindicator3.so.1
 
 for unit in egl-fedora-update.service egl-fedora-update.timer; do
   sed 's|@UPDATE_REPO@|%{update_repo}|g' data/systemd/system/$unit >$unit
@@ -163,6 +176,7 @@ fi
 %{_prefix}/lib/libEOSSDK-Linux-Shipping.so
 %{_prefix}/lib/%{appname}/
 %{_libexecdir}/egl-fedora/
+%{_libdir}/egl-fedora/
 %{_unitdir}/egl-fedora-update.service
 %{_unitdir}/egl-fedora-update.timer
 %{_userunitdir}/egl-fedora-proton-hook.path
@@ -176,6 +190,11 @@ fi
 %ghost %attr(0644,root,root) %{_sharedstatedir}/egl-fedora/presets-applied
 
 %changelog
+* Fri Oct 16 2026 DXVSI <DXVSI@users.noreply.github.com> - 0.96.1-3.gite3e236d
+- Rename the Proton window to "Epic Games: Proton selection" so it sits next to Epic in the menu
+- Notify once per game which Proton it runs on, with a button to change it
+- Add "Choose Proton for games" to the Epic tray menu
+
 * Fri Oct 16 2026 DXVSI <DXVSI@users.noreply.github.com> - 0.96.1-2.gite3e236d
 - egl-fedora: automatic updates from GitHub Releases and Proton selection
 - Repackage official AppImage 0.96.1+ge3e236d

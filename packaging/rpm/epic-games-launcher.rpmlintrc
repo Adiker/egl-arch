@@ -9,3 +9,6 @@ addFilter(r"no-manual-page-for-binary EpicGamesLauncher")
 addFilter(r"invalid-license LicenseRef-Proprietary")
 # egl-proton: графическое приложение, запускается из меню.
 addFilter(r"no-manual-page-for-binary egl-proton")
+# Подменная библиотека трея зависит от настоящей по абсолютному пути, такую
+# зависимость rpm сам не выводит: пакет указан явно.
+addFilter(r"explicit-lib-dependency libayatana-appindicator-gtk3")

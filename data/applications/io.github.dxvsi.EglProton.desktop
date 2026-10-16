@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Proton for Epic
-Name[ru]=Proton для Epic
+Name=Epic Games: Proton selection
+Name[ru]=Epic Games: выбор Proton
+GenericName=Proton selection for Epic games
+GenericName[ru]=Выбор Proton для игр Epic
 Comment=Choose which Proton runs Epic Games Launcher games
 Comment[ru]=Выбор Proton для игр Epic Games Launcher
 Exec=egl-proton
@@ -10,3 +12,5 @@ Terminal=false
 Categories=Game;
 Keywords=proton;wine;epic;
 StartupNotify=true
+# Открывается из трея Epic, правым кликом по ярлыку Epic и из уведомления.
+NoDisplay=true

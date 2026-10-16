@@ -62,7 +62,7 @@ impl ProtonConfig {
     /// Текст файла; `titles` нужны только для комментариев с названиями игр.
     pub fn serialize(&self, titles: &BTreeMap<String, String>) -> String {
         let mut text = String::from(
-            "# Proton для игр Epic Games Launcher. Файл пишет «Proton для Epic» (egl-proton).\n\
+            "# Proton для игр Epic Games Launcher. Файл пишет «Epic Games: выбор Proton» (egl-proton).\n\
              # epic = GE-Proton, который скачивает сам Epic; иначе путь к каталогу Proton.\n",
         );
         text.push_str(&format!("default={}\n", self.default));
