@@ -190,6 +190,10 @@ fi
 %ghost %attr(0644,root,root) %{_sharedstatedir}/egl-fedora/presets-applied
 
 %changelog
+* Fri Oct 16 2026 DXVSI <DXVSI@users.noreply.github.com> - 0.96.1-4.gite3e236d
+- Show the Proton window and notification in English, or in Russian on a Russian locale
+- Write log and update messages in English
+
 * Fri Oct 16 2026 DXVSI <DXVSI@users.noreply.github.com> - 0.96.1-3.gite3e236d
 - Rename the Proton window to "Epic Games: Proton selection" so it sits next to Epic in the menu
 - Notify once per game which Proton it runs on, with a button to change it

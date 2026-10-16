@@ -13,6 +13,9 @@ export HOME="$work/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_STATE_HOME="$HOME/.local/state"
 unset UMU_ID STORE WAYLAND_DISPLAY DISPLAY STEAM_COMPAT_INSTALL_PATH
+# Уведомление на английском, русский проверяется отдельно.
+unset LANGUAGE LC_ALL LC_MESSAGES
+export LANG=C.UTF-8
 # Поддельные notify-send и egl-proton для проверки подсказки.
 fake_bin="$work/bin"
 mkdir -p "$fake_bin"
@@ -101,7 +104,7 @@ check "game=default берёт default" \
 
 printf 'default=/nonexistent/proton\n' >"$conf"
 check "пропавший Proton: откат на Epic" "epic-ge|waitforexitandrun C:\\game.exe -arg||" "$(run_game)"
-check "откат записан в лог" "yes" "$(grep -q 'не найден /nonexistent/proton/proton' "$XDG_STATE_HOME/egl-fedora/proton.log" && echo yes)"
+check "откат записан в лог" "yes" "$(grep -q '/nonexistent/proton/proton not found' "$XDG_STATE_HOME/egl-fedora/proton.log" && echo yes)"
 
 # Epic заново распаковал Proton поверх заглушки.
 fake_proton "$runtime_root/GE-Proton10-34" epic-ge-new
@@ -147,7 +150,7 @@ rm -f "$conf" "$work/notify.log" "$work/opened"
 rm -rf "$XDG_STATE_HOME/egl-fedora/hint-shown"
 run_game >/dev/null
 wait_for_file "$work/opened" || true
-check "подсказка при первом запуске" "ZenlessZoneZero запущена через GE-Proton от Epic" "$(cat "$work/notify.log" 2>/dev/null)"
+check "подсказка при первом запуске" "ZenlessZoneZero is running on Epic's GE-Proton" "$(cat "$work/notify.log" 2>/dev/null)"
 check "кнопка в подсказке открывает окно" "yes" "$([[ -e $work/opened ]] && echo yes)"
 rm -f "$work/notify.log"
 run_game >/dev/null
@@ -155,9 +158,9 @@ sleep 1
 check "второй запуск без подсказки" "" "$(cat "$work/notify.log" 2>/dev/null)"
 printf 'default=%s\n' "$dw" >"$conf"
 rm -rf "$XDG_STATE_HOME/egl-fedora/hint-shown"
-run_game >/dev/null
+(export LANG=ru_RU.UTF-8; run_game >/dev/null)
 wait_for_file "$work/notify.log" || true
-check "подсказка называет Proton по умолчанию" "ZenlessZoneZero запущена через DW-Proton Latest" "$(cat "$work/notify.log" 2>/dev/null)"
+check "подсказка по-русски называет Proton по умолчанию" "ZenlessZoneZero запущена через DW-Proton Latest" "$(cat "$work/notify.log" 2>/dev/null)"
 rm -f "$work/notify.log"
 printf 'game.%s=%s\n' "$app" "$dw" >"$conf"
 rm -rf "$XDG_STATE_HOME/egl-fedora/hint-shown"

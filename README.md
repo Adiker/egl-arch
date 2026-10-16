@@ -1,130 +1,141 @@
-# Epic Games Launcher для Fedora (egl-fedora)
+# Epic Games Launcher for Fedora (egl-fedora)
 
-Неофициальный RPM с Epic Games Launcher для Fedora. Проект не связан с Epic Games
-и не одобрен ею. Epic Games Launcher и EOS SDK внутри пакета остаются
-проприетарным ПО Epic Games.
+An unofficial RPM of the Epic Games Launcher for Fedora. This project is not
+affiliated with or endorsed by Epic Games. The Epic Games Launcher and the EOS
+SDK inside the package remain proprietary Epic Games software.
 
-## Что даёт пакет
+![Proton selection window](docs/screenshots/proton-selection.png)
 
-- **Epic Games Launcher в меню.** Он взят из официального AppImage и работает
-  на системных WebKitGTK 4.1, GTK 3 и libsoup 3, нативно в Wayland.
-- **Автообновление.** Раз в час система проверяет последний релиз этого
-  репозитория и сама ставит новую версию. Делать ничего не нужно.
-- **Выбор Proton.** Окно «Epic Games: выбор Proton» открывается прямо из
-  трея Epic. В нём можно выбрать, через какой Proton запускать игры: GE-Proton,
-  который скачивает сам Epic, DW-Proton, Proton-CachyOS, Proton из Steam и
-  другие. Выбирать можно для всех игр сразу или для каждой игры отдельно.
+## What you get
 
-## Установка
+- **Epic Games Launcher in your app menu.** It is taken from the official
+  AppImage and runs on the system WebKitGTK 4.1, GTK 3 and libsoup 3, natively
+  on Wayland.
+- **Automatic updates.** Once an hour the system checks the latest release of
+  this repository and installs a newer version by itself. You don't need to do
+  anything.
+- **Proton selection.** The "Epic Games: Proton selection" window opens right
+  from the Epic tray icon. In it you choose which Proton runs your games: the
+  GE-Proton that Epic downloads itself, DW-Proton, Proton-CachyOS, Proton from
+  Steam and others. You can set one Proton for all games or a separate one for
+  each game.
 
-1. Скачайте `epic-games-launcher-*.x86_64.rpm` из последнего
-   [релиза](https://github.com/DXVSI/egl-fedora/releases/latest).
-2. Установите его двойным щелчком или командой:
+The Proton selection window and notifications follow the system language:
+English, or Russian on a Russian locale.
 
-   ```fish
+## Installation
+
+1. Download `epic-games-launcher-*.x86_64.rpm` from the latest
+   [release](https://github.com/DXVSI/egl-fedora/releases/latest).
+2. Install it with a double click or with:
+
+   ```sh
    sudo dnf install ./epic-games-launcher-*.x86_64.rpm
    ```
 
-3. Откройте Epic Games Launcher из меню приложений и войдите в аккаунт.
+3. Open Epic Games Launcher from the app menu and sign in.
 
-## Выбор Proton
+## Choosing Proton
 
-Окно «Epic Games: выбор Proton» открывается тремя способами:
+The "Epic Games: Proton selection" window opens in three ways:
 
-- пунктом «Выбрать Proton для игр» в меню трея Epic (первая строка);
-- правой кнопкой по ярлыку Epic Games Launcher в меню приложений, пункт
-  «Выбрать Proton»;
-- кнопкой «Выбрать Proton» в уведомлении. Оно приходит при первом запуске
-  каждой игры и говорит, через какой Proton игра запущена. Если для игры
-  Proton уже выбран, уведомления нет.
+- "Choose Proton for games" in the Epic tray menu (the first item);
+- right-click the Epic Games Launcher entry in the app menu, then
+  "Choose Proton";
+- the "Choose Proton" button in a notification. It appears the first time each
+  game starts and says which Proton the game is running on. If you have already
+  chosen a Proton for that game, there is no notification.
 
-Отдельного значка в меню приложений у окна нет, чтобы не путать его с самим
-лаунчером.
+The window has no entry of its own in the app menu, so it is not confused with
+the launcher itself.
 
-Пункт в трее появляется, когда Epic запущен из меню приложений или по ссылке
-`com.epicgames.launcher://`. Если в настройках Epic включён запуск вместе с
-системой, Epic стартует напрямую и пункта в трее не будет: тогда окно
-открывается правым кликом по ярлыку Epic.
+The tray item appears when Epic is started from the app menu or through a
+`com.epicgames.launcher://` link. If Epic is set to start with the system, it
+starts directly and the tray item is missing. In that case open the window by
+right-clicking the Epic entry.
 
-В окне:
+In the window:
 
-- «По умолчанию» задаёт Proton для всех игр.
-- В разделе «Игры» можно выбрать отдельный Proton для любой установленной игры.
-- Новые версии Proton (DW-Proton, Proton-CachyOS, свежий GE-Proton) удобнее
-  всего ставить через [ProtonPlus](https://flathub.org/apps/com.vysp3r.ProtonPlus),
-  потом нажать «Обновить» в окне.
+- "Default" sets the Proton for all games.
+- The "Games" section lets you choose a separate Proton for any installed game.
+- Newer Proton builds (DW-Proton, Proton-CachyOS, the latest GE-Proton) are
+  easiest to install with
+  [ProtonPlus](https://flathub.org/apps/com.vysp3r.ProtonPlus). Then press
+  Refresh in the window.
 
-Выбор работает, когда Epic уже скачал свой Proton: для этого достаточно один раз
-запустить любую Windows-игру. Если выбранный Proton удалить, игра запустится
-через Proton от Epic.
+Selection works once Epic has downloaded its own Proton: launching any Windows
+game once is enough. If the chosen Proton is removed, the game runs on Epic's
+Proton.
 
-Как это устроено: Epic запускает игры файлом `proton` из своего каталога
-`~/.local/share/com.epicgames.eglv2/compat/runtime/<версия>/`. Пакет заменяет
-этот файл маленькой заглушкой, а оригинал сохраняет рядом как `proton.epic`.
-Заглушка смотрит в `~/.config/egl-fedora/proton.conf` и запускает выбранный
-Proton. Для DW-Proton, GE-Proton и других сборок с protonfixes она дополнительно
-передаёт идентификатор игры, чтобы применились фиксы именно для неё. Журнал
-запусков: `~/.local/state/egl-fedora/proton.log`.
+How it works: Epic launches games with the `proton` file in its directory
+`~/.local/share/com.epicgames.eglv2/compat/runtime/<version>/`. The package
+replaces this file with a small stub and keeps the original next to it as
+`proton.epic`. The stub reads `~/.config/egl-fedora/proton.conf` and runs the
+chosen Proton. For DW-Proton, GE-Proton and other builds with protonfixes it
+also passes the game ID, so the fixes for that particular game apply. Launch
+log: `~/.local/state/egl-fedora/proton.log`.
 
-Пункт в трее добавляет маленькая библиотека `libayatana-appindicator3.so.1` из
-`/usr/lib64/egl-fedora/tray/`. Ярлык Epic ставит этот каталог первым в
-`LD_LIBRARY_PATH`, лаунчер загружает библиотеку трея оттуда, она добавляет пункт
-в меню и передаёт всё остальное настоящей системной библиотеке. Бинарник Epic
-не меняется.
+The tray item is added by a small `libayatana-appindicator3.so.1` in
+`/usr/lib64/egl-fedora/tray/`. The Epic app menu entry puts this directory
+first in `LD_LIBRARY_PATH`, the launcher loads its tray library from there,
+and the library adds the item to the menu and passes everything else to the
+real system library. The Epic binary itself is not modified.
 
-## Обновления
+## Updates
 
-Проверить вручную:
+Check manually:
 
-```fish
+```sh
 sudo /usr/libexec/egl-fedora/egl-update --check
 ```
 
-Выключить автообновление:
+Turn off automatic updates:
 
-```fish
+```sh
 sudo systemctl disable --now egl-fedora-update.timer
 ```
 
-Встроенное самообновление лаунчера в RPM-установке не работает: Epic
-поддерживает его только для .deb и AppImage. Новые версии приходят через этот
-репозиторий.
+The launcher's built-in self-update does not work in an RPM install: Epic
+supports it only for .deb and AppImage. New versions come through this
+repository.
 
-## Удаление
+## Uninstall
 
-```fish
+```sh
 sudo dnf remove epic-games-launcher
 ```
 
-Игры и настройки Epic остаются в `~/.local/share/com.epicgames.eglv2`. После
-удаления пакета игры запускаются через Proton от Epic.
+Your games and Epic settings stay in `~/.local/share/com.epicgames.eglv2`.
+After the package is removed, games run on Epic's Proton.
 
-## Сборка
+## Building
 
-Нужны Fedora, `rpm-build`, `squashfs-tools`, `cargo`, `gcc`, `gtk3-devel`,
+You need Fedora, `rpm-build`, `squashfs-tools`, `cargo`, `gcc`, `gtk3-devel`,
 `gtk4-devel`, `libadwaita-devel`, `libayatana-appindicator-gtk3`, `patchelf`,
-`desktop-file-utils`, `jq` и `curl`.
+`desktop-file-utils`, `jq` and `curl`.
 
-```fish
+```sh
 packaging/scripts/build-rpm.sh build
 ```
 
-Скрипт скачивает официальный AppImage текущей стабильной версии, собирает
-архив исходников с vendored crates и RPM в `build/RPMS/x86_64/`.
+The script downloads the official AppImage of the current stable version and
+builds a source archive with vendored crates and the RPM in
+`build/RPMS/x86_64/`.
 
-Тесты скриптов Proton идут в `%check`. Пункт в трее проверяется отдельно на
-рабочем столе: `tests/tray-shim-check.sh`.
+The Proton script tests run in `%check`. The tray item is tested separately on
+a running desktop: `tests/tray-shim-check.sh`.
 
-## Релизы
+## Releases
 
-Релизы создаёт GitHub Actions (`.github/workflows/release.yml`). Каждые 4 часа
-он проверяет версию Epic. Если для пары «версия Epic + ревизия упаковки» ещё нет
-релиза, он собирает RPM и создаёт черновик релиза с `SHA256SUMS` и attestation.
-Черновик публикует владелец, после этого обновление получают все установки.
+Releases are built by GitHub Actions (`.github/workflows/release.yml`). Every 4
+hours it checks the Epic version. If there is no release yet for the pair
+"Epic version + packaging revision", it builds the RPM and creates a draft
+release with `SHA256SUMS` and an attestation. The owner publishes the draft,
+and then every installation gets the update.
 
-Ревизия упаковки хранится в `packaging/RELEASE`. Чтобы выпустить изменения
-этого репозитория без новой версии Epic, увеличьте её.
+The packaging revision is stored in `packaging/RELEASE`. To release changes in
+this repository without a new Epic version, increase it.
 
-## Лицензия
+## License
 
-Код этого репозитория распространяется под MIT, см. [LICENSE](LICENSE).
+The code in this repository is licensed under MIT, see [LICENSE](LICENSE).

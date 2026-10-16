@@ -24,7 +24,17 @@ log() {
   return 0
 }
 
+# Язык уведомления как у окна и пункта трея: первое непустое из LANGUAGE, LC_ALL,
+# LC_MESSAGES и LANG; русский при ru, иначе английский.
+russian() {
+  case ${LANGUAGE:-${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}} in
+    ru*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Один раз на игру подсказываем, где выбрать Proton, пока для неё не выбран свой.
+# $1: название Proton, пусто для Proton от Epic.
 # Уведомление с кнопкой ждёт ответа, поэтому живёт отдельным процессом (setsid).
 hint_choice() {
   hint_dir=$log_dir/hint-shown
@@ -33,14 +43,27 @@ hint_choice() {
   command -v notify-send >/dev/null 2>&1 || return 0
   command -v setsid >/dev/null 2>&1 || return 0
   mkdir -p "$hint_dir" 2>/dev/null && : >"$hint_dir/$app_name" 2>/dev/null || return 0
-  game=$(basename "${STEAM_COMPAT_INSTALL_PATH:-Игра}")
-  # shellcheck disable=SC2016 # $1 и $2 раскрывает внутренний sh
+  proton=$1
+  if russian; then
+    [ -n "$proton" ] || proton="GE-Proton от Epic"
+    game=$(basename "${STEAM_COMPAT_INSTALL_PATH:-Игра}")
+    title="Epic Games: выбор Proton"
+    button="Выбрать Proton"
+    summary="$game запущена через $proton"
+    body="Другой Proton можно выбрать кнопкой ниже или в меню трея Epic: «Выбрать Proton для игр»."
+  else
+    [ -n "$proton" ] || proton="Epic's GE-Proton"
+    game=$(basename "${STEAM_COMPAT_INSTALL_PATH:-The game}")
+    title="Epic Games: Proton selection"
+    button="Choose Proton"
+    summary="$game is running on $proton"
+    body="Pick a different Proton with the button below or in the Epic tray menu: \"Choose Proton for games\"."
+  fi
+  # shellcheck disable=SC2016 # $1..$4 раскрывает внутренний sh
   setsid -f sh -c '
-    action=$(notify-send --app-name="Epic Games: выбор Proton" --icon=applications-games \
-      --action=choose="Выбрать Proton" "$1 запущена через $2" \
-      "Другой Proton можно выбрать кнопкой ниже или в меню трея Epic: «Выбрать Proton для игр».")
+    action=$(notify-send --app-name="$1" --icon=applications-games --action=choose="$2" "$3" "$4")
     [ "$action" = choose ] && exec egl-proton
-  ' sh "$game" "$1" </dev/null >/dev/null 2>&1
+  ' sh "$title" "$button" "$summary" "$body" </dev/null >/dev/null 2>&1
 }
 
 # Последнее значение ключа из proton.conf.
@@ -66,12 +89,12 @@ if [ "$choice" != epic ]; then
   case $choice in
     /*)
       if [ ! -x "$choice/proton" ]; then
-        log "app=$app_name: не найден $choice/proton, запускаю Proton от Epic"
+        log "app=$app_name: $choice/proton not found, using Epic's Proton"
         choice=epic
       fi
       ;;
     *)
-      log "app=$app_name: непонятное значение '$choice', запускаю Proton от Epic"
+      log "app=$app_name: unknown value '$choice', using Epic's Proton"
       choice=epic
       ;;
   esac
@@ -79,7 +102,7 @@ fi
 
 if [ "$choice" = epic ]; then
   log "app=$app_name proton=epic:$(basename "$runtime_dir") verb=${1:-}"
-  [ "$game_has_choice" = yes ] || hint_choice "GE-Proton от Epic"
+  [ "$game_has_choice" = yes ] || hint_choice ""
   exec "$epic_proton" "$@"
 fi
 

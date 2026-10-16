@@ -22,7 +22,7 @@ wait_limit_seconds=900
 wait_step_seconds=5
 
 case $router in
-  *"'"*) echo "egl-proton-hook: недопустимый путь роутера: $router" >&2; exit 1 ;;
+  *"'"*) echo "egl-proton-hook: invalid router path: $router" >&2; exit 1 ;;
 esac
 
 runtimes() {
@@ -69,7 +69,7 @@ apply_dir() {
 
   if has_marker "$proton" "$stub_marker"; then
     if [[ ! -f $original ]]; then
-      echo "egl-proton-hook: в $dir заглушка есть, а proton.epic нет; оставляю как есть" >&2
+      echo "egl-proton-hook: $dir has the stub but no proton.epic; leaving it as is" >&2
       return 0
     fi
     if [[ $(stub_text) != "$(cat "$proton")" ]]; then
@@ -80,7 +80,7 @@ apply_dir() {
 
   if has_marker "$proton" "$legacy_marker"; then
     if [[ ! -f $dir/proton.ge-orig ]]; then
-      echo "egl-proton-hook: в $dir старая обёртка без proton.ge-orig; оставляю как есть" >&2
+      echo "egl-proton-hook: $dir has the old wrapper without proton.ge-orig; leaving it as is" >&2
       return 0
     fi
     mv -f "$dir/proton.ge-orig" "$original"
@@ -89,7 +89,7 @@ apply_dir() {
     mv -f "$proton" "$original"
   fi
   write_stub "$proton"
-  echo "egl-proton-hook: выбор Proton подключён: $dir"
+  echo "egl-proton-hook: Proton selection installed: $dir"
 }
 
 cmd_apply() {
@@ -106,7 +106,7 @@ cmd_apply() {
     done < <(runtimes)
     ((wait && pending)) || return 0
     if ((waited >= wait_limit_seconds)); then
-      echo "egl-proton-hook: Epic не закончил распаковку Proton за ${wait_limit_seconds} с" >&2
+      echo "egl-proton-hook: Epic did not finish unpacking Proton within ${wait_limit_seconds} s" >&2
       return 0
     fi
     sleep "$wait_step_seconds"
@@ -131,5 +131,5 @@ cmd_status() {
 case "${1:-}" in
   apply) shift; cmd_apply "$@" ;;
   status) cmd_status ;;
-  *) echo "Использование: egl-proton-hook apply [--wait] | status" >&2; exit 2 ;;
+  *) echo "Usage: egl-proton-hook apply [--wait] | status" >&2; exit 2 ;;
 esac

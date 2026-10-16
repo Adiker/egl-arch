@@ -7,6 +7,8 @@ use std::process::Command;
 
 use serde_json::Value;
 
+use crate::i18n::russian;
+
 pub const HOOK: &str = "/usr/libexec/egl-fedora/egl-proton-hook";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,10 +112,13 @@ pub enum HookState {
 }
 
 fn run_hook(args: &[&str]) -> Result<String, String> {
-    let output = Command::new(HOOK)
-        .args(args)
-        .output()
-        .map_err(|error| format!("не удалось запустить {HOOK}: {error}"))?;
+    let output = Command::new(HOOK).args(args).output().map_err(|error| {
+        if russian() {
+            format!("не удалось запустить {HOOK}: {error}")
+        } else {
+            format!("could not run {HOOK}: {error}")
+        }
+    })?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!("{HOOK} {}: {}", args.join(" "), stderr.trim()));
@@ -132,7 +137,12 @@ pub fn parse_status(text: &str) -> HookState {
         }
     }
     if !other.is_empty() && active.is_empty() {
-        return HookState::Failed(format!("перехват не подключён ({})", other.join(", ")));
+        let other = other.join(", ");
+        return HookState::Failed(if russian() {
+            format!("перехват не подключён ({other})")
+        } else {
+            format!("the hook is not installed ({other})")
+        });
     }
     if active.is_empty() {
         HookState::NoRuntime
