@@ -129,9 +129,9 @@ a running desktop: `tests/tray-shim-check.sh`.
 
 Releases are built by GitHub Actions (`.github/workflows/release.yml`). Every 4
 hours it checks the Epic version. If there is no release yet for the pair
-"Epic version + packaging revision", it builds the RPM and creates a draft
-release with `SHA256SUMS` and an attestation. The owner publishes the draft,
-and then every installation gets the update.
+"Epic version + packaging revision", it builds the RPM, runs the tests,
+installs the package on a clean Fedora and publishes a release with
+`SHA256SUMS` and an attestation. Installed copies pick it up within an hour.
 
 The packaging revision is stored in `packaging/RELEASE`. To release changes in
 this repository without a new Epic version, increase it.
