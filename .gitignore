@@ -2,3 +2,4 @@
 /proton-gui/vendor/
 /proton-gui/.cargo/
 /build/
+__pycache__/

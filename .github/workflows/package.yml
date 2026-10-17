@@ -24,7 +24,7 @@ jobs:
         run: >-
           pacman -Syu --noconfirm --needed git rust gtk3 gtk4 libadwaita
           webkit2gtk-4.1 libsoup3 libayatana-appindicator libnotify xdg-utils
-          squashfs-tools patchelf desktop-file-utils namcap shellcheck
+          squashfs-tools patchelf desktop-file-utils namcap shellcheck python
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -32,6 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python -m unittest discover -s packaging/tests -v
           shellcheck -s bash libexec/egl-proton-hook packaging/scripts/*.sh tests/*.sh tray/build.sh
           shellcheck -s sh libexec/egl-proton-router libexec/egl-launch
           useradd --create-home builder
@@ -55,12 +56,13 @@ jobs:
           pacman -Qkk epic-games-launcher-proton-bin
           ldd /opt/epic-games-launcher/bin/EpicGamesLauncher > /tmp/egl-linkage.txt
           cat /tmp/egl-linkage.txt
-          ! grep -q 'not found' /tmp/egl-linkage.txt
+          if grep -q 'not found' /tmp/egl-linkage.txt; then exit 1; fi
           profile=$(mktemp -d)
           env HOME="$profile" XDG_CONFIG_HOME="$profile/config" XDG_STATE_HOME="$profile/state" egl-proton --list
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: epic-games-launcher-arch
+          include-hidden-files: true
           path: |
             build/arch/*.pkg.tar.zst
             build/arch/*.tar.xz

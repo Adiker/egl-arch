@@ -1,0 +1,122 @@
+name: Release upstream AppImage
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      build_current:
+        description: Also build the current version if its release is complete
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-release
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    if: github.repository == 'Adiker/egl-arch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.upstream.outputs.build }}
+      plan: ${{ steps.upstream.outputs.plan }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Discover official stable version and missing release assets
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_CURRENT: ${{ inputs.build_current || false }}
+        run: python3 packaging/scripts/upstream-release.py check
+
+  build:
+    needs: discover
+    if: needs.discover.outputs.build == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: archlinux:base-devel@sha256:061679925e5d5028f2df9395d441ce6c4b9accf0157ff3486c06b6962e014ef1
+    steps:
+      - name: Install build and validation dependencies inside Arch
+        run: >-
+          pacman -Syu --noconfirm --needed git rust gtk3 gtk4 libadwaita
+          webkit2gtk-4.1 libsoup3 libayatana-appindicator libnotify xdg-utils
+          squashfs-tools patchelf desktop-file-utils namcap shellcheck python
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download and pin candidate without executing AppImage
+        env:
+          RELEASE_PLAN: ${{ needs.discover.outputs.plan }}
+        run: |
+          python packaging/scripts/upstream-release.py stage
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- packaging/scripts/prepare-arch.sh --refresh
+      - name: Verify, build and test as an unprivileged user
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s packaging/tests -v
+          shellcheck -s bash libexec/egl-proton-hook packaging/scripts/*.sh tests/*.sh tray/build.sh
+          shellcheck -s sh libexec/egl-proton-router libexec/egl-launch
+          cd build/arch
+          runuser -u builder -- makepkg --verifysource
+          runuser -u builder -- makepkg --printsrcinfo > actual.SRCINFO
+          diff -u .SRCINFO actual.SRCINFO
+          runuser -u builder -- makepkg --cleanbuild --force
+          ../../packaging/scripts/check-namcap.sh PKGBUILD ./*.pkg.tar.zst
+          ../../packaging/scripts/verify-package.sh ./*.pkg.tar.zst src/appdir
+      - name: Verify installed package in the disposable container
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed '/^NoExtract/d' /etc/pacman.conf > /tmp/egl-pacman.conf
+          pacman --config /tmp/egl-pacman.conf -U --noconfirm build/arch/*.pkg.tar.zst
+          pacman -Qkk epic-games-launcher-proton-bin
+          ldd /opt/epic-games-launcher/bin/EpicGamesLauncher > /tmp/linkage.txt
+          cat /tmp/linkage.txt
+          if grep -q 'not found' /tmp/linkage.txt; then exit 1; fi
+          profile=$(mktemp -d)
+          env HOME="$profile" XDG_CONFIG_HOME="$profile/config" XDG_STATE_HOME="$profile/state" egl-proton --list
+          python packaging/scripts/upstream-release.py manifest
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: upstream-release-assets
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            build/arch/*.pkg.tar.zst
+            build/arch/egl-arch-sources-*.tar.xz
+            build/arch/PKGBUILD
+            build/arch/.SRCINFO
+            build/arch/upstream.json
+            build/arch/SHA256SUMS
+
+  publish:
+    needs: [discover, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: upstream-release-assets
+          path: release-assets
+      - name: Commit tested metadata and publish all release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_PLAN: ${{ needs.discover.outputs.plan }}
+        run: python3 packaging/scripts/upstream-release.py publish
