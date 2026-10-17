@@ -96,7 +96,7 @@ jobs:
             build/arch/*.pkg.tar.zst
             build/arch/egl-arch-sources-*.tar.xz
             build/arch/PKGBUILD
-            build/arch/.SRCINFO
+            build/arch/SRCINFO
             build/arch/upstream.json
             build/arch/SHA256SUMS
 

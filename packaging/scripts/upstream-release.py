@@ -82,7 +82,7 @@ def api(path):
 def assets(plan):
     stem = f"{plan['pkgver']}-{plan['pkgrel']}"
     return [f"{PACKAGE}-{stem}-x86_64.pkg.tar.zst", f"egl-arch-sources-{stem}.tar.xz",
-            "PKGBUILD", ".SRCINFO", "upstream.json", "SHA256SUMS"]
+            "PKGBUILD", "SRCINFO", "upstream.json", "SHA256SUMS"]
 
 
 def release_info(tag):
@@ -140,6 +140,9 @@ def stage():
 def manifest():
     work = Path('build/arch')
     plan = json.loads((work / 'upstream.json').read_text())
+    # GitHub Release upload sanitizes a leading dot to "default.SRCINFO".
+    # Keep the canonical .SRCINFO inside AUR/build trees; publish it as SRCINFO.
+    (work / 'SRCINFO').write_bytes((work / '.SRCINFO').read_bytes())
     with (work / 'SHA256SUMS').open('w') as stream:
         for name in assets(plan):
             if name != 'SHA256SUMS':
@@ -169,8 +172,8 @@ def publish():
                 run('gh', 'release', 'download', plan['tag'], '--pattern', name, '--dir', directory)
                 if digest(Path(directory) / name) != digest(work / name):
                     raise ValueError(f"Published asset {name} differs; refusing to overwrite")
-    for name in ('PKGBUILD', '.SRCINFO'):
-        (Path('packaging/arch') / name).write_bytes((work / name).read_bytes())
+    for source, target in [('PKGBUILD', 'PKGBUILD'), ('SRCINFO', '.SRCINFO')]:
+        (Path('packaging/arch') / target).write_bytes((work / source).read_bytes())
     subprocess.run(['git', 'add', 'packaging/arch/PKGBUILD', 'packaging/arch/.SRCINFO'], check=True)
     if run('git', 'diff', '--cached', '--name-only'):
         run('git', '-c', 'user.name=github-actions[bot]', '-c',

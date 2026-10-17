@@ -105,6 +105,28 @@ class DiscoveryTests(unittest.TestCase):
         with patch.object(release, 'api', side_effect=[None, [draft]]):
             self.assertEqual(release.release_info('v0.98.0-1'), draft)
 
+    def test_manifest_uses_release_safe_srcinfo_name(self):
+        plan = release.candidate('0.97.0+g4f63cc1', BASE)
+        with tempfile.TemporaryDirectory() as directory:
+            previous = Path.cwd()
+            try:
+                os.chdir(directory)
+                work = Path('build/arch')
+                work.mkdir(parents=True)
+                for name in release.assets(plan):
+                    if name != 'SHA256SUMS':
+                        (work / name).write_bytes(b'fixture')
+                (work / 'upstream.json').write_text(json.dumps(plan))
+                (work / '.SRCINFO').write_bytes(b'canonical source info')
+                release.manifest()
+                self.assertEqual((work / 'SRCINFO').read_bytes(), b'canonical source info')
+                lines = (work / 'SHA256SUMS').read_text().splitlines()
+                self.assertEqual(len(lines), 5)
+                self.assertTrue(any(line.endswith('  SRCINFO') for line in lines))
+                self.assertFalse(any(line.endswith('  .SRCINFO') for line in lines))
+            finally:
+                os.chdir(previous)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -26,7 +26,9 @@ is claimed by CI.
 After successful validation, a separate job with repository write permission
 commits only PKGBUILD and `.SRCINFO`. It refuses to push if `main` changed during
 the build. A draft release receives the pacman package, port-source archive,
-PKGBUILD, `.SRCINFO`, `upstream.json` and `SHA256SUMS` before publication. A failed
+PKGBUILD, `SRCINFO`, `upstream.json` and `SHA256SUMS` before publication. GitHub
+renames leading-dot asset names, so the release uses `SRCINFO`; rename it to
+`.SRCINFO` for an AUR checkout. A failed
 draft can be completed by the next run. Existing published assets and tags are
 not overwritten. A complete release is skipped by scheduled checks.
 
