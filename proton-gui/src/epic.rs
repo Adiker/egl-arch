@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::i18n::russian;
 
-pub const HOOK: &str = "/usr/libexec/egl-fedora/egl-proton-hook";
+pub const HOOK: &str = "/usr/lib/epic-games-launcher/egl-proton-hook";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Game {

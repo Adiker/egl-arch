@@ -1,184 +1,69 @@
----
-name: Package
+name: Arch package
 
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
-  workflow_call:
-    outputs:
-      fedora-version:
-        description: Stable Fedora release used for the RPM
-        value: ${{ jobs.fedora-release.outputs.version }}
 
 permissions:
   contents: read
 
 concurrency:
-  group: package-${{ github.workflow }}-${{ github.ref }}
+  group: arch-package-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  LC_ALL: C.UTF-8
-
 jobs:
-  lint:
-    name: Lint scripts
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: ShellCheck
-        shell: bash
-        run: |
-          set -euo pipefail
-          shellcheck --version
-          shellcheck -s bash libexec/egl-proton-hook libexec/egl-update \
-            packaging/scripts/*.sh tests/*.sh tray/build.sh
-          shellcheck -s sh libexec/egl-proton-router libexec/egl-launch
-
-  fedora-release:
-    name: Resolve current Fedora
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    outputs:
-      version: ${{ steps.release.outputs.version }}
-      image: ${{ steps.release.outputs.image }}
-    steps:
-      - name: Resolve latest stable Fedora
-        id: release
-        shell: bash
-        run: |
-          set -euo pipefail
-          release_metadata=$(curl --fail --silent --show-error --location \
-            --retry 3 --connect-timeout 15 --max-time 60 \
-            https://fedoraproject.org/releases.json)
-          fedora_version=$(jq -er '
-            if type != "array" then error("Expected Fedora releases array") else . end
-            | [
-                .[]
-                | select(.version | type == "string")
-                | select(.version | test("^[1-9][0-9]*$"))
-                | .version as $version
-                | select(.link | type == "string")
-                | select(.link | startswith(
-                    "https://download.fedoraproject.org/pub/fedora/linux/releases/"
-                    + $version + "/"))
-                | $version | tonumber
-              ]
-            | if length == 0 then error("No stable Fedora release found")
-              else max | tostring end
-          ' <<< "$release_metadata")
-
-          image_tag="registry.fedoraproject.org/fedora:$fedora_version"
-          docker pull "$image_tag"
-          image=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image_tag")
-          if [[ ! "$image" =~ ^registry\.fedoraproject\.org/fedora@sha256:[0-9a-f]{64}$ ]]; then
-            echo "Fedora image did not resolve to an immutable registry digest" >&2
-            exit 1
-          fi
-          actual_version=$(docker run --rm --read-only --network none \
-            --entrypoint /bin/sh "$image" -eu -c \
-            '. /etc/os-release; test "$ID" = fedora; printf "%s\n" "$VERSION_ID"')
-          if [[ "$actual_version" != "$fedora_version" ]]; then
-            echo "Fedora image version $actual_version does not match release $fedora_version" >&2
-            exit 1
-          fi
-          printf 'version=%s\nimage=%s\n' "$fedora_version" "$image" >> "$GITHUB_OUTPUT"
-
-  rpm:
-    name: RPM / Fedora ${{ needs.fedora-release.outputs.version }}
-    needs: fedora-release
+  package:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     container:
-      image: ${{ needs.fedora-release.outputs.image }}
-    defaults:
-      run:
-        shell: bash
+      image: archlinux:base-devel@sha256:061679925e5d5028f2df9395d441ce6c4b9accf0157ff3486c06b6962e014ef1
     steps:
-      - name: Install Fedora build tools
-        run: |
-          set -euo pipefail
-          dnf install -y --setopt=install_weak_deps=False \
-            binutils \
-            cargo \
-            cpio \
-            curl \
-            desktop-file-utils \
-            findutils \
-            gawk \
-            gcc \
-            git \
-            gtk3-devel \
-            gtk4-devel \
-            jq \
-            libadwaita-devel \
-            libayatana-appindicator-gtk3 \
-            patchelf \
-            rpm-build \
-            rpmlint \
-            rust \
-            shadow-utils \
-            squashfs-tools \
-            systemd-rpm-macros \
-            tar \
-            xz
-
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install build and validation dependencies in the container
+        run: >-
+          pacman -Syu --noconfirm --needed git rust gtk3 gtk4 libadwaita
+          webkit2gtk-4.1 libsoup3 libayatana-appindicator libnotify xdg-utils
+          squashfs-tools patchelf desktop-file-utils namcap shellcheck
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Build RPM
-        id: package
+      - name: Prepare, verify and build as an unprivileged user
+        shell: bash
         run: |
           set -euo pipefail
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          test -z "$(git status --porcelain --untracked-files=all)"
-
-          rpm_topdir="$RUNNER_TEMP/rpmbuild"
+          shellcheck -s bash libexec/egl-proton-hook packaging/scripts/*.sh tests/*.sh tray/build.sh
+          shellcheck -s sh libexec/egl-proton-router libexec/egl-launch
           useradd --create-home builder
-          mkdir -p "$rpm_topdir"
-          chown -R builder:builder "$GITHUB_WORKSPACE" "$rpm_topdir"
-          runuser -u builder -- git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          runuser -u builder -- packaging/scripts/build-rpm.sh "$rpm_topdir"
-
-          mapfile -t rpm_files < <(find "$rpm_topdir/RPMS/x86_64" -maxdepth 1 -type f \
-            -name 'epic-games-launcher-*.fc*.x86_64.rpm')
-          test "${#rpm_files[@]}" -eq 1
-          mkdir -p dist
-          install -m 0644 "${rpm_files[0]}" "dist/$(basename "${rpm_files[0]}")"
-          echo "file=dist/$(basename "${rpm_files[0]}")" >> "$GITHUB_OUTPUT"
-
-      - name: Verify package
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- packaging/scripts/prepare-arch.sh
+          cd build/arch
+          runuser -u builder -- makepkg --verifysource
+          runuser -u builder -- makepkg --printsrcinfo > actual.SRCINFO
+          diff -u .SRCINFO actual.SRCINFO
+          runuser -u builder -- makepkg --cleanbuild --force
+          ../../packaging/scripts/check-namcap.sh PKGBUILD ./*.pkg.tar.zst
+          ../../packaging/scripts/verify-package.sh ./*.pkg.tar.zst src/appdir
+      - name: Check installed linkage inside the disposable container
+        shell: bash
         run: |
           set -euo pipefail
-          packaging/scripts/verify-package.sh "${{ steps.package.outputs.file }}"
-
-      - name: Install on clean Fedora
-        run: |
-          set -euo pipefail
-          dnf install -y "${{ steps.package.outputs.file }}"
-          rpm -V epic-games-launcher
-          test -x /usr/bin/EpicGamesLauncher
-          /usr/bin/egl-proton --list
-          ldd /usr/bin/EpicGamesLauncher | tee /tmp/ldd.txt
-          if grep -q 'not found' /tmp/ldd.txt; then
-            echo "EpicGamesLauncher has unresolved libraries" >&2
-            exit 1
-          fi
-
-      - name: Upload RPM
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+          # The base container excludes documentation by default; validate the
+          # complete package here, including its documentation directories.
+          sed '/^NoExtract/d' /etc/pacman.conf > /tmp/egl-pacman.conf
+          pacman --config /tmp/egl-pacman.conf -U --noconfirm build/arch/*.pkg.tar.zst
+          pacman -Qkk epic-games-launcher-proton-bin
+          ldd /opt/epic-games-launcher/bin/EpicGamesLauncher > /tmp/egl-linkage.txt
+          cat /tmp/egl-linkage.txt
+          ! grep -q 'not found' /tmp/egl-linkage.txt
+          profile=$(mktemp -d)
+          env HOME="$profile" XDG_CONFIG_HOME="$profile/config" XDG_STATE_HOME="$profile/state" egl-proton --list
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: egl-fedora-rpm-${{ github.run_id }}
-          path: ${{ steps.package.outputs.file }}
+          name: epic-games-launcher-arch
+          path: |
+            build/arch/*.pkg.tar.zst
+            build/arch/*.tar.xz
+            build/arch/PKGBUILD
+            build/arch/.SRCINFO
           if-no-files-found: error
-          retention-days: 14

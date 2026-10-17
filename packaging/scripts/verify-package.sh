@@ -1,71 +1,65 @@
 #!/usr/bin/env bash
-# Проверяет собранный RPM: состав файлов, зависимости, rpmlint.
-# Использование: verify-package.sh <файл.rpm>
-
+# Inspect a pacman package without installing it. Optional second argument:
+# the original extracted AppImage tree, for byte-for-byte payload comparison.
 set -euo pipefail
-
-rpm_file=$(realpath "${1:?Использование: verify-package.sh <файл.rpm>}")
-repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-failures=0
-
-fail() {
-  echo "verify-package: $*" >&2
-  failures=$((failures + 1))
-}
-
-files=$(rpm -qlp "$rpm_file")
-for path in \
-  /usr/bin/EpicGamesLauncher \
-  /usr/bin/egl-proton \
-  /usr/lib/libEOSSDK-Linux-Shipping.so \
-  /usr/lib/epic-games-launcher/libEOSSDK-Linux-Shipping.so \
-  /usr/lib/epic-games-launcher/resources/ThirdPartyNotices.txt \
-  /usr/libexec/egl-fedora/egl-launch \
-  /usr/libexec/egl-fedora/egl-proton-hook \
-  /usr/libexec/egl-fedora/egl-proton-router \
-  /usr/libexec/egl-fedora/egl-update \
-  /usr/lib64/egl-fedora/tray/libayatana-appindicator3.so.1 \
-  /usr/lib/systemd/system/egl-fedora-update.service \
-  /usr/lib/systemd/system/egl-fedora-update.timer \
-  /usr/lib/systemd/user/egl-fedora-proton-hook.path \
-  /usr/lib/systemd/user/egl-fedora-proton-hook.service \
-  /usr/lib/systemd/system-preset/80-egl-fedora.preset \
-  /usr/lib/systemd/user-preset/80-egl-fedora.preset \
-  /usr/share/applications/epic-games-launcher.desktop \
-  /usr/share/applications/io.github.dxvsi.EglProton.desktop \
-  /usr/share/icons/hicolor/128x128/apps/EpicGamesLauncher.png; do
-  grep -qxF "$path" <<<"$files" || fail "нет файла $path"
-done
-
-requires=$(rpm -qp --requires "$rpm_file")
-grep -q '^libEOSSDK' <<<"$requires" && fail "пакет требует libEOSSDK извне"
-for dep in 'libwebkit2gtk-4.1.so.0()(64bit)' 'libadwaita-1.so.0()(64bit)' '/usr/bin/dnf' curl; do
-  grep -qxF "$dep" <<<"$requires" || fail "нет зависимости $dep"
-done
-grep -q '^libEOSSDK' <<<"$(rpm -qp --provides "$rpm_file")" && fail "пакет объявляет libEOSSDK как общую библиотеку"
-
-# Адрес релизов подставлен при сборке.
+package=$(realpath "${1:?Usage: verify-package.sh package.pkg.tar.zst [original-appdir]}")
+original=${2:-}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-# Через файл, а не канал: cpio закрывает вход, найдя все файлы, и rpm2cpio
-# получил бы SIGPIPE.
-rpm2cpio "$rpm_file" >"$work/payload.cpio"
-(cd "$work" && cpio -idm --quiet <payload.cpio \
-  ./usr/libexec/egl-fedora/egl-update \
-  ./usr/lib/systemd/system/egl-fedora-update.service \
-  ./usr/lib64/egl-fedora/tray/libayatana-appindicator3.so.1)
-grep -rq '@UPDATE_REPO@' "$work" && fail "не подставлен @UPDATE_REPO@"
-
-# Подменная библиотека трея: своя soname и настоящая библиотека по абсолютному пути.
-tray_dynamic=$(readelf -d "$work/usr/lib64/egl-fedora/tray/libayatana-appindicator3.so.1")
-grep -qF '[libegl-fedora-tray.so]' <<<"$tray_dynamic" || fail "у библиотеки трея не та soname"
-grep -qF '[/usr/lib64/libayatana-appindicator3.so.1]' <<<"$tray_dynamic" ||
-  fail "библиотека трея не зависит от настоящей по абсолютному пути"
-
-rpmlint -r "$repo_root/packaging/rpm/epic-games-launcher.rpmlintrc" "$rpm_file" || fail "rpmlint нашёл ошибки"
-
-if ((failures)); then
-  echo "verify-package: ошибок: $failures" >&2
+bsdtar -xf "$package" -C "$work"
+pkgname=$(sed -n 's/^pkgname = //p' "$work/.PKGINFO")
+[[ $pkgname == epic-games-launcher-bin || $pkgname == epic-games-launcher-proton-bin ]]
+for file in \
+  usr/bin/epic-games-launcher usr/bin/EpicGamesLauncher usr/bin/egl-proton \
+  opt/epic-games-launcher/bin/EpicGamesLauncher \
+  opt/epic-games-launcher/lib/libEOSSDK-Linux-Shipping.so \
+  opt/epic-games-launcher/lib/epic-games-launcher/libEOSSDK-Linux-Shipping.so \
+  opt/epic-games-launcher/lib/epic-games-launcher/resources/ThirdPartyNotices.txt \
+  usr/lib/epic-games-launcher/egl-proton-hook \
+  usr/lib/epic-games-launcher/egl-proton-router \
+  usr/lib/epic-games-launcher/tray/libayatana-appindicator3.so.1 \
+  usr/lib/systemd/user/egl-fedora-proton-hook.path \
+  usr/lib/systemd/user/egl-fedora-proton-hook.service \
+  usr/share/applications/EpicGamesLauncher.desktop \
+  usr/share/applications/epic-games-launcher.desktop \
+  usr/share/applications/io.github.dxvsi.EglProton.desktop \
+  usr/share/icons/hicolor/128x128/apps/EpicGamesLauncher.png \
+  "usr/share/licenses/$pkgname/LICENSE"; do
+  [[ -e $work/$file ]] || { echo "Missing: $file" >&2; exit 1; }
+done
+[[ $(readlink "$work/usr/bin/EpicGamesLauncher") == epic-games-launcher ]]
+# KWin resolves icons by app_id + .desktop, not StartupWMClass on Wayland.
+desktop="$work/usr/share/applications/EpicGamesLauncher.desktop"
+grep -qxF 'Icon=/usr/share/icons/hicolor/128x128/apps/EpicGamesLauncher.png' "$desktop"
+grep -qxF 'StartupWMClass=EpicGamesLauncher' "$desktop"
+if grep -qxF 'NoDisplay=true' "$desktop"; then
+  echo 'The primary Wayland desktop entry must be visible' >&2
   exit 1
 fi
-echo "verify-package: $(basename "$rpm_file") в порядке"
+grep -qxF 'NoDisplay=true' "$work/usr/share/applications/epic-games-launcher.desktop"
+diff -u "$desktop" <(sed '/^NoDisplay=true$/d' "$work/usr/share/applications/epic-games-launcher.desktop")
+[[ ! -e $work/usr/lib/systemd/system && ! -e $work/usr/lib/systemd/user-preset ]]
+if find "$work" -name '*update*' -o -name '*.rpm' | grep -q .; then
+  echo 'Unexpected updater or RPM in package' >&2
+  exit 1
+fi
+# Only the two Epic EOS libraries and our tray shim may be shipped as libraries.
+[[ $(find "$work/opt" "$work/usr/lib/epic-games-launcher" -type f -name '*.so*' | wc -l) == 3 ]]
+for dep in gtk3 gtk4 webkit2gtk-4.1 libsoup3 glib2 dconf libayatana-appindicator libadwaita libnotify; do
+  grep -qxF "depend = $dep" "$work/.PKGINFO"
+done
+if grep -Eq '^depend = (dnf|rpm|wine|xorg-xwayland)([<>=]|$)' "$work/.PKGINFO"; then
+  echo 'Unexpected Fedora/Wine/XWayland requirement' >&2
+  exit 1
+fi
+shim="$work/usr/lib/epic-games-launcher/tray/libayatana-appindicator3.so.1"
+readelf -d "$shim" | grep -qF '[/usr/lib/libayatana-appindicator3.so.1]'
+readelf -d "$shim" | grep -qF '[libegl-fedora-tray.so]'
+desktop-file-validate "$work"/usr/share/applications/*.desktop
+if [[ -n $original ]]; then
+  cmp "$original/usr/bin/EpicGamesLauncher" "$work/opt/epic-games-launcher/bin/EpicGamesLauncher"
+  cmp "$original/usr/lib/libEOSSDK-Linux-Shipping.so" "$work/opt/epic-games-launcher/lib/libEOSSDK-Linux-Shipping.so"
+  diff -r "$original/usr/lib/epic-games-launcher" "$work/opt/epic-games-launcher/lib/epic-games-launcher"
+fi
+printf 'Package layout, dependencies, tray linkage and desktop entries: OK\n'
+[[ -z $original ]] || printf 'Epic binary, EOS SDK and Tauri resources: byte-identical to AppImage\n'

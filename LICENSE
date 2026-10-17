@@ -21,5 +21,5 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 This license covers the egl-fedora scripts, packaging and the egl-proton
-application. Epic Games Launcher and the EOS SDK included in the built RPM are
+application. Epic Games Launcher and the EOS SDK included in the built package are
 proprietary software of Epic Games, Inc. and are not covered by this license.

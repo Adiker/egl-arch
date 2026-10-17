@@ -1,10 +1,12 @@
 [Desktop Entry]
+# Filename must match the native Wayland app_id: EpicGamesLauncher.
 Type=Application
 Name=Epic Games Launcher
 Comment=Epic Games Store and game library
 Comment[ru]=Магазин и библиотека игр Epic Games
-Exec=/usr/libexec/egl-fedora/egl-launch %u
-Icon=EpicGamesLauncher
+Exec=epic-games-launcher %u
+# Use the original PNG directly, including in an already-running Plasma panel.
+Icon=/usr/share/icons/hicolor/128x128/apps/EpicGamesLauncher.png
 Terminal=false
 Categories=Game;
 StartupWMClass=EpicGamesLauncher

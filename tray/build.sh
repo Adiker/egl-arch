@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Собирает подменную libayatana-appindicator3.so.1 (см. egl-tray.c).
 # Использование: tray/build.sh <каталог>
-# CC, CFLAGS и LDFLAGS берутся из окружения (в rpmbuild это флаги Fedora).
+# CC, CFLAGS and LDFLAGS are supplied by makepkg.
 
 set -euo pipefail
 
 out_dir=${1:?Использование: tray/build.sh <каталог>}
-real=/usr/lib64/libayatana-appindicator3.so.1
+real=/usr/lib/libayatana-appindicator3.so.1
 src="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/egl-tray.c"
 target="$out_dir/libayatana-appindicator3.so.1"
 
-[[ -e $real ]] || { echo "tray/build.sh: нет $real (пакет libayatana-appindicator-gtk3)" >&2; exit 1; }
+[[ -e $real ]] || { echo "tray/build.sh: missing $real (install libayatana-appindicator)" >&2; exit 1; }
 mkdir -p "$out_dir"
 read -ra cflags <<<"${CFLAGS:--O2 -g}"
 read -ra ldflags <<<"${LDFLAGS:-}"

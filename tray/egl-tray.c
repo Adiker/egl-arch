@@ -16,7 +16,7 @@
 
 #include <gtk/gtk.h>
 
-#define REAL_LIBRARY "/usr/lib64/libayatana-appindicator3.so.1"
+#define REAL_LIBRARY "/usr/lib/libayatana-appindicator3.so.1"
 #define ITEM_KEY "egl-fedora-proton-item"
 #define EPIC_PROCESS "EpicGamesLauncher"
 #define CHOOSER "/usr/bin/egl-proton"

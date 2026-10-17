@@ -1,12 +1,25 @@
 #!/bin/sh
-# Запуск Epic Games Launcher из ярлыка и по ссылкам com.epicgames.launcher://.
-# Перед запуском ставит выбор Proton в runtime, которые Epic скачал с прошлого раза.
-# Ошибка перехвата не мешает запуску: игры тогда идут через Proton от Epic.
+# Native launcher entry point, also used by com.epicgames.launcher:// links.
+# Keep the AppImage's AppRun and bundled GTK/GLib out of this process.
 
-/usr/libexec/egl-fedora/egl-proton-hook apply >/dev/null || true
+# A desktop link can itself be opened by another AppImage. Do not let that
+# application's module/schema paths or self-update identity leak into Epic.
+if [ -n "${APPIMAGE:-}${APPDIR:-}" ]; then
+  unset GTK_DATA_PREFIX GTK_EXE_PREFIX GTK_PATH GTK_IM_MODULE_FILE
+  unset GDK_PIXBUF_MODULE_FILE GSETTINGS_SCHEMA_DIR GI_TYPELIB_PATH GIO_EXTRA_MODULES
+  unset GST_PLUGIN_SYSTEM_PATH GST_PLUGIN_SYSTEM_PATH_1_0 GST_PLUGIN_PATH_1_0
+  unset GST_PLUGIN_SCANNER_1_0 GST_PTP_HELPER_1_0
+fi
+unset APPIMAGE APPDIR
 
-# Подменная библиотека трея добавляет в меню трея Epic пункт «Выбрать Proton для игр»
-# (см. tray/egl-tray.c). В этом каталоге больше ничего нет.
-LD_LIBRARY_PATH=/usr/lib64/egl-fedora/tray${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-export LD_LIBRARY_PATH
-exec /usr/bin/EpicGamesLauncher "$@"
+/usr/lib/epic-games-launcher/egl-proton-hook apply >/dev/null || true
+# Watch future runtime downloads for this login, without enabling global units.
+systemctl --user start egl-fedora-proton-hook.path >/dev/null 2>&1 || true
+
+# GTK selects X11 only if it cannot open Wayland. Explicit user overrides work.
+GDK_BACKEND=${GDK_BACKEND:-wayland,x11}
+# Only our tray shim belongs here. The original ELF RUNPATH locates Epic's EOS
+# SDK; all GTK, WebKit, GLib and GIO libraries come from the system.
+LD_LIBRARY_PATH=/usr/lib/epic-games-launcher/tray
+export GDK_BACKEND LD_LIBRARY_PATH
+exec /opt/epic-games-launcher/bin/EpicGamesLauncher "$@"

@@ -3,4 +3,4 @@ Description=Connect Proton choice to new Epic Games Launcher Proton runtimes (eg
 
 [Service]
 Type=oneshot
-ExecStart=/usr/libexec/egl-fedora/egl-proton-hook apply --wait
+ExecStart=/usr/lib/epic-games-launcher/egl-proton-hook apply --wait

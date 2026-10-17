@@ -97,9 +97,14 @@ pub fn search_dirs(home: &Path) -> Vec<PathBuf> {
 }
 
 pub fn discover(home: &Path) -> Vec<ProtonInstall> {
+    discover_in(search_dirs(home))
+}
+
+// Accept explicit search roots so tests never inspect the host's Proton builds.
+fn discover_in(dirs: impl IntoIterator<Item = PathBuf>) -> Vec<ProtonInstall> {
     let mut seen = BTreeSet::new();
     let mut found = Vec::new();
-    for dir in search_dirs(home) {
+    for dir in dirs {
         let Ok(entries) = fs::read_dir(&dir) else {
             continue;
         };
@@ -125,6 +130,14 @@ pub fn discover(home: &Path) -> Vec<ProtonInstall> {
 mod tests {
     use super::*;
     use std::fs;
+
+    fn discover(home: &Path) -> Vec<ProtonInstall> {
+        super::discover_in(
+            search_dirs(home)
+                .into_iter()
+                .filter(|dir| dir.starts_with(home)),
+        )
+    }
 
     fn temp_dir(name: &str) -> PathBuf {
         let dir =

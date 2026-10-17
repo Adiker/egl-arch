@@ -91,7 +91,7 @@ check "английская подпись" "item: Choose Proton for games" "$(s
 
 plain=$(LANG=ru_RU.UTF-8 "$work/bin/EpicGamesLauncher" 2>/dev/null)
 plain_lib=$(sed -n 's/^set_menu from //p' <<<"$plain")
-check "без LD_LIBRARY_PATH грузится системная библиотека" "/usr/lib64/libayatana-appindicator3.so.1.0.0" "$(readlink -f "$plain_lib")"
+check "без LD_LIBRARY_PATH грузится системная библиотека" "$(readlink -f /usr/lib/libayatana-appindicator3.so.1)" "$(readlink -f "$plain_lib")"
 
 if ((failures)); then
   echo "Провалено проверок: $failures" >&2
