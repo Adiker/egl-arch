@@ -100,10 +100,22 @@ class DiscoveryTests(unittest.TestCase):
             finally:
                 os.chdir(previous)
 
-    def test_draft_recovery_when_tag_lookup_returns_404(self):
-        draft = dict(tag_name='v0.98.0-1', draft=True)
-        with patch.object(release, 'api', side_effect=[None, [draft]]):
-            self.assertEqual(release.release_info('v0.98.0-1'), draft)
+    def test_draft_discovery_bypasses_cached_rest_endpoints(self):
+        draft = dict(isDraft=True, url='https://github.com/example/repo/releases/tag/untagged-123',
+                     releaseAssets=dict(nodes=[]))
+        response = json.dumps(dict(data=dict(repository=dict(release=draft))))
+        with patch.object(release, 'run', return_value=response) as request, \
+             patch.dict(os.environ, GITHUB_REPOSITORY='example/repo'):
+            actual = release.release_info('v0.98.0-1')
+            self.assertTrue(actual['draft'])
+            self.assertEqual(actual['assets'], [])
+            self.assertEqual(request.call_args.args[:3], ('gh', 'api', 'graphql'))
+
+    def test_absent_release_is_a_normal_discovery_result(self):
+        response = json.dumps(dict(data=dict(repository=dict(release=None))))
+        with patch.object(release, 'run', return_value=response), \
+             patch.dict(os.environ, GITHUB_REPOSITORY='example/repo'):
+            self.assertIsNone(release.release_info('v0.98.0-1'))
 
     def test_manifest_uses_release_safe_srcinfo_name(self):
         plan = release.candidate('0.97.0+g4f63cc1', BASE)

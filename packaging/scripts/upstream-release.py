@@ -11,7 +11,6 @@ import subprocess
 import tempfile
 from urllib.parse import unquote, urlsplit
 from urllib.request import Request, urlopen
-from urllib.error import HTTPError
 
 STABLE = "https://content-download-egs.distro.on.epicgames.com/Builds/EGLv2/stable-target.json"
 INSTALLER = "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncher-x86_64.AppImage"
@@ -66,19 +65,6 @@ def verify_redirect(url, plan):
         raise ValueError("Stable metadata and official installer redirect disagree")
 
 
-def api(path):
-    request = Request(f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/{path}",
-                      headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
-                               "Accept": "application/vnd.github+json"})
-    try:
-        with urlopen(request, timeout=60) as response:
-            return json.load(response)
-    except HTTPError as error:
-        if error.code == 404:
-            return None
-        raise
-
-
 def assets(plan):
     stem = f"{plan['pkgver']}-{plan['pkgrel']}"
     return [f"{PACKAGE}-{stem}-x86_64.pkg.tar.zst", f"egl-arch-sources-{stem}.tar.xz",
@@ -86,12 +72,19 @@ def assets(plan):
 
 
 def release_info(tag):
-    release = api(f"releases/tags/{tag}")
-    if release:
-        return release
-    # A draft may not have a public Git tag yet. The publisher can still see it
-    # in the releases list and complete a previously interrupted publication.
-    return next((r for r in api('releases?per_page=100') if r['tag_name'] == tag), None)
+    # Use a GraphQL POST: the REST tag/list endpoints can cache a pre-creation
+    # 404 or an empty list for 60 seconds, and drafts need not have a public tag.
+    owner, name = os.environ['GITHUB_REPOSITORY'].split('/')
+    query = ('query($owner:String!,$name:String!,$tag:String!){'
+             'repository(owner:$owner,name:$name){release(tagName:$tag){'
+             'isDraft url releaseAssets(first:100){nodes{name}}}}}')
+    result = json.loads(run('gh', 'api', 'graphql', '-f', f'query={query}',
+                            '-f', f'owner={owner}', '-f', f'name={name}', '-f', f'tag={tag}'))
+    release = result['data']['repository']['release']
+    if release is None:
+        return None
+    return dict(draft=release['isDraft'], assets=release['releaseAssets']['nodes'],
+                html_url=release['url'])
 
 
 def output(key, value):
@@ -194,7 +187,8 @@ def publish():
                  "User data and games are preserved. AUR publication is managed separately.\n")
         run('gh', 'release', 'create', plan['tag'], '--target', commit, '--draft',
             '--title', f"Arch / EndeavourOS port {plan['pkgver']}-{plan['pkgrel']}", '--notes', notes)
-        release = release_info(plan['tag'])
+        # Creation succeeded; do not immediately query a possibly stale reader.
+        release = dict(draft=True, assets=[])
     existing = {asset['name']: asset for asset in release['assets']}
     for name in assets(plan):
         if name in existing and not release['draft']:
@@ -205,7 +199,7 @@ def publish():
         run(*args)
     if release['draft']:
         run('gh', 'release', 'edit', plan['tag'], '--draft=false', '--latest')
-    confirmed = api(f"releases/tags/{plan['tag']}")
+    confirmed = release_info(plan['tag'])
     if confirmed['draft'] or not set(assets(plan)) <= {a['name'] for a in confirmed['assets']}:
         raise ValueError("Release publication verification failed")
     print(confirmed['html_url'])
