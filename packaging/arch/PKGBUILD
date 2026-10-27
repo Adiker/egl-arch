@@ -1,9 +1,9 @@
 # Maintainer: Adiker (https://aur.archlinux.org/account/Adiker)
 # Unofficial native Epic Games Launcher Preview; upstream binaries are unmodified.
 pkgname=epic-games-launcher-proton-bin
-pkgver=0.103.0
+pkgver=0.104.0
 pkgrel=1
-_epic_gitrev=66c2498
+_epic_gitrev=2229d5c
 pkgdesc='Native Epic Games Launcher Preview with per-game Proton selection'
 arch=('x86_64')
 url='https://github.com/Adiker/egl-arch'
@@ -26,7 +26,7 @@ source=(
 )
 noextract=("EpicGamesLauncher-${pkgver}+g${_epic_gitrev}-${CARCH}.AppImage")
 sha256sums=(
-  '6e2ce1f5d50d16678eb59adf09eaffb9e928fae44a3bdae9b10d810de249575b'
+  '58882fa0eb7cdf51ad3cbffcadce2ec836b0a1c025b1c0f2bbae7854e1489c95'
   'd32a7e7bc7e87934ccbc3e0664c3abe38d71218eac2ee5cbc6749f1e8fea3a68' # port sources
 )
 
