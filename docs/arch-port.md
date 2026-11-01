@@ -8,7 +8,8 @@ libayatana-appindicator shim; shell hooks routed per-game Proton choices.
 Fedora-specific code also installed an hourly root DNF updater and presets.
 The Arch port retains the game integration and removes that update mechanism.
 
-The current pinned Epic release is `0.97.0+g4f63cc1` (verified 2026-10-17).
+The diagnosis used Epic release `0.97.0+g4f63cc1` (verified 2026-10-17).
+This is a historical artifact; current build metadata is in `packaging/arch/PKGBUILD`.
 The official stable metadata and installer redirect agreed on this artifact:
 
 - [Stable metadata](https://content-download-egs.distro.on.epicgames.com/Builds/EGLv2/stable-target.json)

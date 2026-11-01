@@ -184,7 +184,8 @@ def publish():
                  "SHA256SUMS covers the package, port sources and metadata. "
                  "AppImage SHA256 is recorded in upstream.json and PKGBUILD.\n\n"
                  "Install the downloaded package with `sudo pacman -U ./epic-games-launcher-proton-bin-*.pkg.tar.zst`. "
-                 "User data and games are preserved. AUR publication is managed separately.\n")
+                 "User data and games are preserved.\n\n"
+                 "<!-- aur-sync:start -->\nAUR: synchronization pending.\n<!-- aur-sync:end -->\n")
         run('gh', 'release', 'create', plan['tag'], '--target', commit, '--draft',
             '--title', f"Arch / EndeavourOS port {plan['pkgver']}-{plan['pkgrel']}", '--notes', notes)
         # Creation succeeded; do not immediately query a possibly stale reader.
