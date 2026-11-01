@@ -39,9 +39,15 @@ different existing asset. For changed integration sources, increase `pkgrel`
 and refresh source metadata before dispatching, rather than modifying an existing
 release's source archive.
 
-The workflow uses the built-in `GITHUB_TOKEN`; no PAT or AUR SSH key is required.
-It does not push to AUR, install anything on users' computers, or add an updater
-to the launcher. The AUR PKGBUILD must be updated separately after a release.
+The separate `Sync AUR package` workflow checks the latest published GitHub
+release after successful release checks and every six hours as a retry. It
+validates the release package checksum and matching package metadata, refuses
+downgrades and unexpected recipe or dependency changes, repackages with makepkg,
+and pushes only PKGBUILD and .SRCINFO to AUR. It needs a dedicated AUR SSH key
+registered with the maintainer account and the private key in the GitHub Actions
+secret `AUR_SSH_PRIVATE_KEY`. The AUR key can update packages managed by that
+account; limit repository access accordingly. The workflow does not install
+anything on users' computers or add an updater to the launcher.
 Enable Actions if GitHub disables scheduled workflows after repository inactivity.
 
 Manual execution:
