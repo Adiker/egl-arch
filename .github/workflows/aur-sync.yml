@@ -44,7 +44,7 @@ jobs:
           gh release download "$tag" --pattern 'epic-games-launcher-proton-bin-*-x86_64.pkg.tar.zst' --pattern SRCINFO --pattern SHA256SUMS --dir release
           git clone https://aur.archlinux.org/epic-games-launcher-proton-bin.git aur
           useradd --create-home builder
-          chown -R builder:builder "$GITHUB_WORKSPACE"
+          chown -R builder:builder "$GITHUB_WORKSPACE/aur"
           runuser -u builder -- python packaging/scripts/sync-aur.py aur release "$tag"
           git config --global --add safe.directory "$GITHUB_WORKSPACE/aur"
           cd aur
