@@ -1,0 +1,76 @@
+name: Sync AUR package
+
+on:
+  workflow_run:
+    workflows: ['Release upstream AppImage']
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '47 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aur-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'Adiker/egl-arch' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: archlinux:base-devel@sha256:061679925e5d5028f2df9395d441ce6c4b9accf0157ff3486c06b6962e014ef1
+    steps:
+      - name: Install tools
+        run: pacman -Syu --noconfirm --needed git github-cli python openssh curl
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Download and verify the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=$(gh release view --json tagName,isDraft,isPrerelease --jq 'select(.isDraft == false and .isPrerelease == false) | .tagName')
+          [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ ]]
+          mkdir release aur
+          gh release download "$tag" --pattern 'epic-games-launcher-proton-bin-*-x86_64.pkg.tar.zst' --pattern SRCINFO --pattern SHA256SUMS --dir release
+          git clone https://aur.archlinux.org/epic-games-launcher-proton-bin.git aur
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- python packaging/scripts/sync-aur.py aur release "$tag"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/aur"
+          cd aur
+          if git diff --quiet; then
+            echo 'AUR is up to date'
+            exit 0
+          fi
+          runuser -u builder -- makepkg --nodeps --force
+          git diff --check
+          git diff
+      - name: Publish AUR update
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd aur
+          test -n "$AUR_SSH_PRIVATE_KEY" || { echo 'Missing AUR_SSH_PRIVATE_KEY secret' >&2; exit 1; }
+          install -d -m 700 /tmp/aur-ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > /tmp/aur-ssh/key
+          chmod 600 /tmp/aur-ssh/key
+          printf '%s\n' 'aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN' > /tmp/aur-ssh/known_hosts
+          export GIT_SSH_COMMAND='ssh -i /tmp/aur-ssh/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/tmp/aur-ssh/known_hosts'
+          git ls-remote ssh://aur@aur.archlinux.org/epic-games-launcher-proton-bin.git HEAD > /dev/null
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PKGBUILD .SRCINFO
+          git commit -m 'Update prebuilt GitHub release'
+          git push ssh://aur@aur.archlinux.org/epic-games-launcher-proton-bin.git HEAD:master
