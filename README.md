@@ -18,7 +18,9 @@ or load that application's private GTK/GIO modules.
 
 ## Build and install
 
-The AUR package is **epic-games-launcher-proton-bin**. It includes this fork's
+The [AUR package](https://aur.archlinux.org/packages/epic-games-launcher-proton-bin)
+is **epic-games-launcher-proton-bin**. It downloads a prebuilt GitHub release;
+it does not compile Rust locally. It includes this fork's
 Proton chooser, runtime router, tray integration and Wayland/cursor/icon fixes;
 it conflicts with the separate `epic-games-launcher-bin` package. Replacing that
 package preserves Epic's user data and installed games.
@@ -30,7 +32,8 @@ makepkg --verifysource
 makepkg -si
 ```
 
-Alternatively, build from this source repository as described below.
+Alternatively, install the package from [GitHub Releases](https://github.com/Adiker/egl-arch/releases/latest)
+with `sudo pacman -U`, or build from this source repository as described below.
 
 Use an up-to-date Arch/EndeavourOS x86_64 system. Install the build dependencies
 when you are ready to allow system changes:
@@ -134,10 +137,10 @@ normal Arch gaming setup, not private copies inside this package.
 
 ## Updates and removal
 
-There is no background package updater. Obtain the next reviewed repository
-version, prepare a fresh build directory, build it, then install the new package
-with `sudo pacman -U`. A locally built package is not automatically available
-through `pacman -Syu` unless you separately maintain a pacman repository for it.
+There is no background package updater. For a source build, obtain the next
+reviewed repository version, rebuild and install it with `sudo pacman -U`. For a
+GitHub release, download and install the newer package. AUR and locally built
+packages are not updated by `pacman -Syu` alone.
 Epic can still download games and its game compatibility runtimes normally.
 For the AUR package, review and rebuild the updated PKGBUILD with your usual AUR
 helper, or run `git pull --ff-only` and `makepkg -si` in its AUR checkout.
@@ -163,8 +166,10 @@ packaging/scripts/prepare-arch.sh --refresh
 The PKGBUILD downloads its checksummed source snapshot from this fork's pinned
 GitHub release. The preparation helper generates exactly the same snapshot for
 local development. Publish that source archive with the matching `v<pkgver>-<pkgrel>`
-release before pushing an updated PKGBUILD and `.SRCINFO` to AUR. Never upload
-Epic's AppImage or a compiled pacman package to the AUR Git repository.
+release. A separate GitHub Actions workflow synchronizes the prebuilt-package
+AUR recipe after publication; see [release automation](docs/automation.md). The
+AUR recipe is distinct from the source-building PKGBUILD in this repository.
+Never upload Epic's AppImage or a compiled pacman package to AUR Git.
 
 Namcap's generic ELF-path rule reports `/opt` as an error. This is the one
 documented exception for the deliberately private, unmodified proprietary
@@ -172,9 +177,10 @@ payload. `check-namcap.sh` prints every diagnostic and rejects any other error.
 Upstream EOS hardening/legacy linkage and Epic's retained debug symbols may also
 produce warnings; the package verifier separately checks paths and byte identity.
 
-For an Epic update, explicitly update `pkgver`, `_epic_gitrev` and the AppImage
-SHA256 in `packaging/arch/PKGBUILD`, reset `pkgrel`, and run the same preparation
-and validation steps. The official stable metadata and installer redirect must
+For a manual Epic update, update `pkgver`, `_epic_gitrev` and the AppImage
+SHA256 in `packaging/arch/PKGBUILD`; reset `pkgrel` for a new version or
+increment it for a new upstream revision of the same version. Run the same
+preparation and validation steps. The official stable metadata and installer redirect must
 agree; verify the version inside the extracted ELF as well. PKGBUILD never
 resolves a moving "latest" URL. Review checksums; never replace them with SKIP.
 
@@ -187,8 +193,9 @@ cargo clippy --locked --manifest-path proton-gui/Cargo.toml --all-targets -- -D 
 tests/tray-shim-check.sh  # needs a desktop; defaults to Wayland first
 ```
 
-GitHub Actions builds an Arch pacman artifact and validates it in a disposable
-container. It does not publish releases or install updates on users' machines.
+GitHub Actions builds and validates Arch packages in a disposable container,
+publishes releases and synchronizes AUR. It does not install updates on users'
+machines. See [release automation](docs/automation.md) for checks and limits.
 The previous Fedora implementation is preserved in Git history; historical
 Fedora investigation notes are not current installation instructions.
 

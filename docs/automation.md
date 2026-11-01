@@ -27,9 +27,9 @@ After successful validation, a separate job with repository write permission
 commits only PKGBUILD and `.SRCINFO`. It refuses to push if `main` changed during
 the build. A draft release receives the pacman package, port-source archive,
 PKGBUILD, `SRCINFO`, `upstream.json` and `SHA256SUMS` before publication. GitHub
-renames leading-dot asset names, so the release uses `SRCINFO`; rename it to
-`.SRCINFO` for an AUR checkout. A failed
-draft can be completed by the next run. Existing published assets and tags are
+renames leading-dot asset names, so the source-build metadata asset is named
+`SRCINFO`. The separate prebuilt AUR recipe has its own generated `.SRCINFO`.
+A failed draft can be completed by the next run. Existing published assets and tags are
 not overwritten. A complete release is skipped by scheduled checks.
 
 The first run can complete an existing source-only release without changing its
@@ -43,7 +43,13 @@ The separate `Sync AUR package` workflow checks the latest published GitHub
 release after successful release checks and every six hours as a retry. It
 validates the release package checksum and matching package metadata, refuses
 downgrades and unexpected recipe or dependency changes, repackages with makepkg,
-and pushes only PKGBUILD and .SRCINFO to AUR. It needs a dedicated AUR SSH key
+and pushes only PKGBUILD and .SRCINFO to AUR. After confirming the AUR Git
+HEAD matches the checked or pushed commit, it records the verified commit in the
+release notes. A newly published release initially says synchronization is
+pending; a failure leaves it pending until a successful retry. The note records
+a point-in-time verification, not a guarantee against later external changes.
+The sync workflow requires GitHub contents-write permission to edit the note.
+It needs a dedicated AUR SSH key
 registered with the maintainer account and the private key in the GitHub Actions
 secret `AUR_SSH_PRIVATE_KEY`. The AUR key can update packages managed by that
 account; limit repository access accordingly. The workflow does not install
@@ -54,4 +60,5 @@ Manual execution:
 
 ```sh
 gh workflow run upstream-release.yml --repo Adiker/egl-arch --ref main
+gh workflow run aur-sync.yml --repo Adiker/egl-arch --ref main
 ```
