@@ -2,7 +2,7 @@
 # Unofficial native Epic Games Launcher Preview; upstream binaries are unmodified.
 pkgname=epic-games-launcher-proton-bin
 pkgver=0.111.0
-pkgrel=1
+pkgrel=2
 _epic_gitrev=3921dcd
 pkgdesc='Native Epic Games Launcher Preview with per-game Proton selection'
 arch=('x86_64')
@@ -14,35 +14,30 @@ depends=(
   'libayatana-appindicator' 'libgcc' 'libnotify' 'libsoup3' 'libstdc++'
   'libx11' 'systemd' 'util-linux' 'webkit2gtk-4.1' 'xdg-utils'
 )
-makedepends=('rust' 'squashfs-tools' 'patchelf')
+makedepends=('rust' 'patchelf')
 checkdepends=('desktop-file-utils')
 provides=("epic-games-launcher=$pkgver")
 conflicts=('epic-games-launcher' 'epic-games-launcher-bin')
 # Preserve Epic's ELF bytes, debug information and original RUNPATHs.
 options=('!strip' '!debug')
 source=(
-  "EpicGamesLauncher-${pkgver}+g${_epic_gitrev}-${CARCH}.AppImage::https://content-download-egs.distro.on.epicgames.com/Builds/EGLv2/${pkgver}%2Bg${_epic_gitrev}/Linux/EpicGamesLauncher-${CARCH}.AppImage"
+  "EpicGamesLauncher-${pkgver}+g${_epic_gitrev}-${CARCH}.deb::https://content-download-egs.distro.on.epicgames.com/Builds/EGLv2/${pkgver}%2Bg${_epic_gitrev}/Linux/EpicGamesLauncher-${CARCH}.deb"
   "https://github.com/Adiker/egl-arch/releases/download/v${pkgver}-${pkgrel}/egl-arch-sources-${pkgver}-${pkgrel}.tar.xz"
 )
-noextract=("EpicGamesLauncher-${pkgver}+g${_epic_gitrev}-${CARCH}.AppImage")
+noextract=("EpicGamesLauncher-${pkgver}+g${_epic_gitrev}-${CARCH}.deb")
 sha256sums=(
-  'def7625dc1a1c5c65bd45bfd83b44d8210a03a0ea678963e21d55cf67fbaa326'
-  '8383399ed457244bca1ded3b3b28f60005aac1e617c8d7db8e12b8a92808ea42' # port sources
+  '0e01451883060f0b6028d311163ebd9f938d80ffb49f9720603ea6cc7aba666c'
+  '175bef135e7741f73f923dfa346e03df24173dff78bff6820f2bc4717a060ea8' # port sources
 )
 
 prepare() {
-  local image="EpicGamesLauncher-${pkgver}+g${_epic_gitrev}-${CARCH}.AppImage"
-  local offset
-  offset=$(LC_ALL=C readelf -h "$image" | awk '
-    /Start of section headers/ {s = $5}
-    /Size of section headers/ {z = $5}
-    /Number of section headers/ {n = $5}
-    END {print s + z * n}')
-  [[ $offset =~ ^[1-9][0-9]*$ ]]
+  local deb="EpicGamesLauncher-${pkgver}+g${_epic_gitrev}-${CARCH}.deb"
+  local data_archive
+  data_archive=$(ar t "$deb" | grep -Ex 'data\.tar\.(gz|xz|zst)')
+  [[ -n $data_archive && $data_archive != *$'\n'* ]]
   rm -rf -- "$srcdir/appdir"
-  unsquashfs -q -no-xattrs -o "$offset" -d appdir "$image" \
-    usr/bin/EpicGamesLauncher usr/lib/libEOSSDK-Linux-Shipping.so \
-    usr/lib/epic-games-launcher usr/share/icons
+  mkdir -p appdir
+  ar p "$deb" "$data_archive" | bsdtar -xf - -C appdir
   grep -aqF "EpicGamesLauncher/${pkgver}+g${_epic_gitrev}" appdir/usr/bin/EpicGamesLauncher
 
   cd egl-arch/proton-gui
@@ -70,7 +65,6 @@ check() {
 package() {
   local epic="$pkgdir/opt/epic-games-launcher"
   install -Dm755 appdir/usr/bin/EpicGamesLauncher "$epic/bin/EpicGamesLauncher"
-  install -Dm755 appdir/usr/lib/libEOSSDK-Linux-Shipping.so "$epic/lib/libEOSSDK-Linux-Shipping.so"
   install -dm755 "$epic/lib/epic-games-launcher"
   cp -a appdir/usr/lib/epic-games-launcher/. "$epic/lib/epic-games-launcher/"
   chmod 755 "$epic/lib/epic-games-launcher/libEOSSDK-Linux-Shipping.so"

@@ -1,6 +1,6 @@
 # Epic Games Launcher Preview for Arch Linux / EndeavourOS
 
-Unofficial native pacman packaging of Epic's official x86_64 AppImage, with
+Unofficial native pacman packaging of Epic's official x86_64 DEB, with
 per-game Proton selection. The launcher runs directly on system GTK3,
 WebKitGTK 4.1, libsoup3 and GLib/GIO. KDE Plasma 6 and AMD Radeon are the primary
 test environment. This project is not affiliated with Epic Games.
@@ -39,7 +39,7 @@ Use an up-to-date Arch/EndeavourOS x86_64 system. Install the build dependencies
 when you are ready to allow system changes:
 
 ```sh
-sudo pacman -Syu --needed base-devel rust squashfs-tools patchelf desktop-file-utils namcap \
+sudo pacman -Syu --needed base-devel rust patchelf desktop-file-utils namcap \
   gtk3 gtk4 libadwaita webkit2gtk-4.1 libsoup3 libayatana-appindicator libnotify xdg-utils
 ```
 
@@ -57,9 +57,9 @@ makepkg
 ../../packaging/scripts/verify-package.sh ./*.pkg.tar.zst src/appdir
 ```
 
-`makepkg` downloads the pinned official Epic AppImage. Cargo downloads the locked
-Rust dependencies during `prepare()`; build and tests run offline. Neither
-AppRun nor the AppImage runtime is executed. Run makepkg as your normal user.
+`makepkg` downloads the pinned official Epic DEB. Cargo downloads the locked
+Rust dependencies during `prepare()`; build and tests run offline. DEB installer
+scripts are never executed. Run makepkg as your normal user.
 Only the following explicit installation step changes the host installation:
 
 ```sh
@@ -116,9 +116,8 @@ not rewrite your existing autostart files.
 
 ## Cursor and graphics
 
-The package deliberately excludes the AppImage's GTK/GLib/GIO libraries and
-AppRun hooks. Their Ubuntu module paths prevent the bundled GIO from finding
-Arch's dconf backend, so it reads Adwaita defaults instead of KDE's cursor theme.
+The package uses system GTK/GLib/GIO libraries. The formerly used AppImage's
+Ubuntu module paths prevented its bundled GIO from finding Arch's dconf backend.
 System libraries read the existing dconf/KDE settings. No cursor theme is
 hardcoded, installed or changed globally. See [the diagnosis](docs/arch-port.md).
 
@@ -169,7 +168,7 @@ local development. Publish that source archive with the matching `v<pkgver>-<pkg
 release. A separate GitHub Actions workflow synchronizes the prebuilt-package
 AUR recipe after publication; see [release automation](docs/automation.md). The
 AUR recipe is distinct from the source-building PKGBUILD in this repository.
-Never upload Epic's AppImage or a compiled pacman package to AUR Git.
+Never upload Epic's DEB or a compiled pacman package to AUR Git.
 
 Namcap's generic ELF-path rule reports `/opt` as an error. This is the one
 documented exception for the deliberately private, unmodified proprietary
@@ -177,7 +176,7 @@ payload. `check-namcap.sh` prints every diagnostic and rejects any other error.
 Upstream EOS hardening/legacy linkage and Epic's retained debug symbols may also
 produce warnings; the package verifier separately checks paths and byte identity.
 
-For a manual Epic update, update `pkgver`, `_epic_gitrev` and the AppImage
+For a manual Epic update, update `pkgver`, `_epic_gitrev` and the DEB
 SHA256 in `packaging/arch/PKGBUILD`; reset `pkgrel` for a new version or
 increment it for a new upstream revision of the same version. Run the same
 preparation and validation steps. The official stable metadata and installer redirect must
