@@ -12,6 +12,17 @@ if [ -n "${APPIMAGE:-}${APPDIR:-}" ]; then
 fi
 unset APPIMAGE APPDIR
 
+# GTK 3 otherwise uses its own chooser outside a sandbox. On Plasma, ask the
+# desktop portal for native dialogs while respecting even an empty override.
+case ":${XDG_CURRENT_DESKTOP:-}:" in
+  *:KDE:*)
+    if [ "${GTK_USE_PORTAL+x}" != x ]; then
+      GTK_USE_PORTAL=1
+      export GTK_USE_PORTAL
+    fi
+    ;;
+esac
+
 /usr/lib/epic-games-launcher/egl-proton-hook apply >/dev/null || true
 # Watch future runtime downloads for this login, without enabling global units.
 systemctl --user start egl-fedora-proton-hook.path >/dev/null 2>&1 || true
