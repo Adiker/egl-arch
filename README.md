@@ -14,6 +14,12 @@ The wrapper also clears a caller AppImage's identity and module/schema paths,
 so opening a link from another AppImage cannot enable Epic's AppImage updater
 or load that application's private GTK/GIO modules.
 
+On KDE, the wrapper enables GTK's desktop portal so supported file and folder
+choosers use the configured portal backend (normally `xdg-desktop-portal-kde`).
+Install and run the desktop portal and its KDE backend for this integration.
+The setting is inherited by child processes. To override it, start a new
+launcher process with `GTK_USE_PORTAL=0 epic-games-launcher`.
+
 ![Proton selection](docs/screenshots/proton-selection.png)
 
 ## Build and install

@@ -32,6 +32,13 @@ library dependency. patchelf changes only this project-built shim. It never
 modifies an Epic binary or system library. No Wine or XWayland package is a hard
 runtime dependency of this package. GTK's X11 ABI dependencies remain valid.
 
+On KDE sessions the wrapper defaults `GTK_USE_PORTAL` to `1`, unless explicitly
+set, allowing GTK3 native file choosers to use the desktop's FileChooser portal.
+This requires a working portal and configured backend; the variable is also
+inherited by launcher children. GTK may use its own chooser if the portal is
+unavailable. Epic 0.111.0 requests a folder with no parent handle and
+`modal=false`, so portal window parenting and modality are not guaranteed.
+
 ## Reproduced cursor failure
 
 The analysis used the user's downloaded official AppImage, extracted without
