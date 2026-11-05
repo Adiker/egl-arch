@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Inspect a pacman package without installing it. Optional second argument:
-# the original extracted AppImage tree, for byte-for-byte payload comparison.
+# the original extracted DEB data tree, for byte-for-byte payload comparison.
 set -euo pipefail
-package=$(realpath "${1:?Usage: verify-package.sh package.pkg.tar.zst [original-appdir]}")
+package=$(realpath "${1:?Usage: verify-package.sh package.pkg.tar.zst [original-deb-tree]}")
 original=${2:-}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -12,7 +12,6 @@ pkgname=$(sed -n 's/^pkgname = //p' "$work/.PKGINFO")
 for file in \
   usr/bin/epic-games-launcher usr/bin/EpicGamesLauncher usr/bin/egl-proton \
   opt/epic-games-launcher/bin/EpicGamesLauncher \
-  opt/epic-games-launcher/lib/libEOSSDK-Linux-Shipping.so \
   opt/epic-games-launcher/lib/epic-games-launcher/libEOSSDK-Linux-Shipping.so \
   opt/epic-games-launcher/lib/epic-games-launcher/resources/ThirdPartyNotices.txt \
   usr/lib/epic-games-launcher/egl-proton-hook \
@@ -43,8 +42,8 @@ if find "$work" -name '*update*' -o -name '*.rpm' | grep -q .; then
   echo 'Unexpected updater or RPM in package' >&2
   exit 1
 fi
-# Only the two Epic EOS libraries and our tray shim may be shipped as libraries.
-[[ $(find "$work/opt" "$work/usr/lib/epic-games-launcher" -type f -name '*.so*' | wc -l) == 3 ]]
+# Only the Epic EOS library and our tray shim may be shipped as libraries.
+[[ $(find "$work/opt" "$work/usr/lib/epic-games-launcher" -type f -name '*.so*' | wc -l) == 2 ]]
 for dep in gtk3 gtk4 webkit2gtk-4.1 libsoup3 glib2 dconf libayatana-appindicator libadwaita libnotify; do
   grep -qxF "depend = $dep" "$work/.PKGINFO"
 done
@@ -58,8 +57,7 @@ readelf -d "$shim" | grep -qF '[libegl-fedora-tray.so]'
 desktop-file-validate "$work"/usr/share/applications/*.desktop
 if [[ -n $original ]]; then
   cmp "$original/usr/bin/EpicGamesLauncher" "$work/opt/epic-games-launcher/bin/EpicGamesLauncher"
-  cmp "$original/usr/lib/libEOSSDK-Linux-Shipping.so" "$work/opt/epic-games-launcher/lib/libEOSSDK-Linux-Shipping.so"
   diff -r "$original/usr/lib/epic-games-launcher" "$work/opt/epic-games-launcher/lib/epic-games-launcher"
 fi
 printf 'Package layout, dependencies, tray linkage and desktop entries: OK\n'
-[[ -z $original ]] || printf 'Epic binary, EOS SDK and Tauri resources: byte-identical to AppImage\n'
+[[ -z $original ]] || printf 'Epic binary, EOS SDK and Tauri resources: byte-identical to DEB\n'

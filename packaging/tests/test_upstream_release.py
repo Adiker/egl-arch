@@ -13,6 +13,7 @@ spec.loader.exec_module(release)
 BASE = """pkgver=0.97.0
 pkgrel=4
 _epic_gitrev=4f63cc1
+source=("EpicGamesLauncher.deb::https://content-download-egs.distro.on.epicgames.com/file.deb")
 sha256sums=(
   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
   'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' # port sources
@@ -26,6 +27,13 @@ class DiscoveryTests(unittest.TestCase):
         self.assertFalse(plan['changed'])
         self.assertEqual(plan['tag'], 'v0.97.0-4')
         self.assertEqual(plan['expected_sha256'], 'a' * 64)
+
+    def test_source_format_change_increments_release_and_discards_old_hash(self):
+        old = BASE.replace('.deb::', '.AppImage::')
+        plan = release.candidate('0.97.0+g4f63cc1', old)
+        self.assertTrue(plan['changed'])
+        self.assertEqual(plan['tag'], 'v0.97.0-5')
+        self.assertIsNone(plan['expected_sha256'])
 
     def test_new_version_resets_release(self):
         plan = release.candidate('0.98.0+gabcdef1', BASE)
@@ -48,7 +56,7 @@ class DiscoveryTests(unittest.TestCase):
 
     def test_installer_agreement_and_host(self):
         plan = release.candidate('0.97.0+g4f63cc1', BASE)
-        release.verify_redirect(plan['url'] + '?launcherfilename=EpicGamesLauncher-x86_64.AppImage', plan)
+        release.verify_redirect(plan['url'] + '?launcherfilename=EpicGamesLauncher-x86_64.deb', plan)
         release.verify_redirect(plan['url'].replace('%2B', '+'), plan)
         for url in [plan['url'].replace('https:', 'http:'), plan['url'].replace('0.97.0', '0.98.0'),
                     plan['url'].replace('content-download-egs.distro.on.epicgames.com', 'example.org')]:
@@ -72,7 +80,7 @@ class DiscoveryTests(unittest.TestCase):
                 os.chdir(root)
                 with patch.object(release, 'PKGBUILD', pkgbuild), patch.dict(os.environ, RELEASE_PLAN=json.dumps(plan)), \
                      patch.object(release.subprocess, 'run', side_effect=download):
-                    with self.assertRaisesRegex(ValueError, 'different AppImage checksum'):
+                    with self.assertRaisesRegex(ValueError, 'different DEB checksum'):
                         release.stage()
                 self.assertEqual(pkgbuild.read_text(), BASE)
             finally:
@@ -85,7 +93,7 @@ class DiscoveryTests(unittest.TestCase):
             pkgbuild = root / 'PKGBUILD'
             pkgbuild.write_text(BASE)
             def download(args, **kwargs):
-                Path(args[args.index('--output') + 1]).write_bytes(b'new AppImage')
+                Path(args[args.index('--output') + 1]).write_bytes(b'new DEB')
             previous = Path.cwd()
             try:
                 os.chdir(root)
@@ -94,7 +102,7 @@ class DiscoveryTests(unittest.TestCase):
                      patch.object(release.subprocess, 'run', side_effect=download):
                     release.stage()
                 self.assertEqual(release.current_metadata(pkgbuild.read_text()),
-                                 ('0.98.0', 1, 'abcdef1', hashlib.sha256(b'new AppImage').hexdigest()))
+                                 ('0.98.0', 1, 'abcdef1', hashlib.sha256(b'new DEB').hexdigest()))
                 self.assertIn("'" + 'b' * 64 + "' # port sources", pkgbuild.read_text())
                 self.assertEqual(json.loads((root / 'build/arch/upstream.json').read_text())['build_commit'], 'c' * 40)
             finally:
@@ -116,6 +124,36 @@ class DiscoveryTests(unittest.TestCase):
         with patch.object(release, 'run', return_value=response), \
              patch.dict(os.environ, GITHUB_REPOSITORY='example/repo'):
             self.assertIsNone(release.release_info('v0.98.0-1'))
+
+    def test_publish_rejects_conflicting_asset_before_metadata_changes(self):
+        plan = release.candidate('0.97.0+g4f63cc1', BASE)
+        asset = release.assets(plan)[0]
+        with tempfile.TemporaryDirectory() as directory:
+            previous = Path.cwd()
+            try:
+                os.chdir(directory)
+                work = Path('release-assets')
+                work.mkdir()
+                (work / 'upstream.json').write_text(json.dumps(plan))
+                (work / asset).write_bytes(b'new')
+                def command(*args, **kwargs):
+                    if args[:2] == ('git', 'ls-remote'):
+                        return 'c' * 40 + '\trefs/heads/main'
+                    if args[:3] == ('gh', 'release', 'download'):
+                        (Path(args[args.index('--dir') + 1]) / asset).write_bytes(b'published')
+                        return ''
+                    raise AssertionError(f'unexpected command: {args}')
+                with patch.dict(os.environ, RELEASE_PLAN=json.dumps(plan), GITHUB_SHA='c' * 40), \
+                     patch.object(release, 'run', side_effect=command), \
+                     patch.object(release.subprocess, 'run') as subprocess_run, \
+                     patch.object(release, 'release_info', return_value={
+                         'draft': False, 'assets': [{'name': asset}]}):
+                    with self.assertRaisesRegex(ValueError, 'refusing to overwrite'):
+                        release.publish()
+                    self.assertEqual(subprocess_run.call_count, 1)  # checksum verification only
+                self.assertFalse(Path('packaging').exists())
+            finally:
+                os.chdir(previous)
 
     def test_manifest_uses_release_safe_srcinfo_name(self):
         plan = release.candidate('0.97.0+g4f63cc1', BASE)

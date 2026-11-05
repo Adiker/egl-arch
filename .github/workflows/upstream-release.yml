@@ -1,4 +1,4 @@
-name: Release upstream AppImage
+name: Release upstream DEB
 
 on:
   schedule:
@@ -48,11 +48,11 @@ jobs:
         run: >-
           pacman -Syu --noconfirm --needed git rust gtk3 gtk4 libadwaita
           webkit2gtk-4.1 libsoup3 libayatana-appindicator libnotify xdg-utils
-          squashfs-tools patchelf desktop-file-utils namcap shellcheck python
+          patchelf desktop-file-utils namcap shellcheck python
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Download and pin candidate without executing AppImage
+      - name: Download and pin candidate without executing DEB scripts
         env:
           RELEASE_PLAN: ${{ needs.discover.outputs.plan }}
         run: |

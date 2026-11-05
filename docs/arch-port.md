@@ -9,7 +9,8 @@ Fedora-specific code also installed an hourly root DNF updater and presets.
 The Arch port retains the game integration and removes that update mechanism.
 
 The diagnosis used Epic release `0.97.0+g4f63cc1` (verified 2026-10-17).
-This is a historical artifact; current build metadata is in `packaging/arch/PKGBUILD`.
+This is a historical artifact; the current package uses Epic's DEB, with build
+metadata in `packaging/arch/PKGBUILD`.
 The official stable metadata and installer redirect agreed on this artifact:
 
 - [Stable metadata](https://content-download-egs.distro.on.epicgames.com/Builds/EGLv2/stable-target.json)
@@ -19,10 +20,10 @@ The official stable metadata and installer redirect agreed on this artifact:
 AppImage SHA256: `5cf8607bb0a8f29a9887249d491c3c41ea3d0e8ed06a86695aa8e3b6000edae6`.
 This is a measured payload checksum, not an upstream cryptographic signature.
 
-The private package tree contains `bin/EpicGamesLauncher`,
-`lib/libEOSSDK-Linux-Shipping.so` and `lib/epic-games-launcher/`, including the
-second upstream EOS copy and Tauri resources. The binary's original
-`$ORIGIN/../lib` RUNPATH and Tauri's relative resource layout are preserved.
+The private package tree contains `bin/EpicGamesLauncher` and
+`lib/epic-games-launcher/`, including the EOS library and Tauri resources.
+The DEB binary's original `$ORIGIN/../lib/epic-games-launcher` RUNPATH and
+Tauri's relative resource layout are preserved.
 Only Epic's files are copied there; GTK, WebKit and other general libraries are
 resolved from Arch. The Epic binary requires GLIBC up to 2.34.
 

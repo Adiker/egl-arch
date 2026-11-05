@@ -2,7 +2,7 @@ name: Sync AUR package
 
 on:
   workflow_run:
-    workflows: ['Release upstream AppImage']
+    workflows: ['Release upstream DEB']
     types: [completed]
     branches: [main]
   schedule:

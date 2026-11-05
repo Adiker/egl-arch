@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Discover Epic's stable AppImage and prepare/publish a tested Arch release."""
+"""Discover Epic's stable DEB and prepare/publish a tested Arch release."""
 
 import argparse
 import hashlib
@@ -13,7 +13,7 @@ from urllib.parse import unquote, urlsplit
 from urllib.request import Request, urlopen
 
 STABLE = "https://content-download-egs.distro.on.epicgames.com/Builds/EGLv2/stable-target.json"
-INSTALLER = "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncher-x86_64.AppImage"
+INSTALLER = "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncher-x86_64.deb"
 PKGBUILD = Path("packaging/arch/PKGBUILD")
 PACKAGE = "epic-games-launcher-proton-bin"
 
@@ -50,13 +50,16 @@ def candidate(version, text):
     oldver, oldrel, oldrev, checksum = current_metadata(text)
     if tuple(map(int, pkgver.split('.'))) < tuple(map(int, oldver.split('.'))):
         raise ValueError("Stable metadata requests a downgrade; manual review required")
-    changed = (pkgver, gitrev) != (oldver, oldrev)
+    formats = re.findall(r'\.((?:AppImage)|(?:deb))::https://content-download-egs\.distro\.on\.epicgames\.com/', text)
+    if len(formats) != 1:
+        raise ValueError("Expected exactly one recognized Epic source format")
+    changed = (pkgver, gitrev) != (oldver, oldrev) or formats[0] != 'deb'
     pkgrel = (1 if pkgver != oldver else oldrel + 1) if changed else oldrel
     return dict(version=version, pkgver=pkgver, pkgrel=pkgrel, gitrev=gitrev,
                 changed=changed, expected_sha256=None if changed else checksum,
                 tag=f"v{pkgver}-{pkgrel}",
-                image=f"EpicGamesLauncher-{pkgver}+g{gitrev}-x86_64.AppImage",
-                url=f"https://content-download-egs.distro.on.epicgames.com/Builds/EGLv2/{pkgver}%2Bg{gitrev}/Linux/EpicGamesLauncher-x86_64.AppImage")
+                image=f"EpicGamesLauncher-{pkgver}+g{gitrev}-x86_64.deb",
+                url=f"https://content-download-egs.distro.on.epicgames.com/Builds/EGLv2/{pkgver}%2Bg{gitrev}/Linux/EpicGamesLauncher-x86_64.deb")
 
 
 def verify_redirect(url, plan):
@@ -120,12 +123,12 @@ def stage():
                     '--retry', '3', '--max-time', '600', '--output', str(image), plan['url']], check=True)
     checksum = digest(image)
     if plan['expected_sha256'] and checksum != plan['expected_sha256']:
-        raise ValueError("Same upstream version has a different AppImage checksum; refusing to repin")
+        raise ValueError("Same upstream version has a different DEB checksum; refusing to repin")
     for key, value in [('pkgver', plan['pkgver']), ('pkgrel', plan['pkgrel']), ('_epic_gitrev', plan['gitrev'])]:
         text = re.sub(rf"^{key}=.*$", f"{key}={value}", text, count=1, flags=re.M)
     text = re.sub(r"(?m)^  '[a-f0-9]{64}'$", f"  '{checksum}'", text, count=1)
     PKGBUILD.write_text(text)
-    plan['appimage_sha256'] = checksum
+    plan['deb_sha256'] = checksum
     plan['build_commit'] = os.environ['GITHUB_SHA']
     (work / 'upstream.json').write_text(json.dumps(plan, indent=2) + '\n')
 
@@ -171,7 +174,7 @@ def publish():
     if run('git', 'diff', '--cached', '--name-only'):
         run('git', '-c', 'user.name=github-actions[bot]', '-c',
             'user.email=41898282+github-actions[bot]@users.noreply.github.com',
-            'commit', '-m', f"Update Epic AppImage to {plan['version']}")
+            'commit', '-m', f"Update Epic DEB to {plan['version']}")
         run('git', 'push', 'origin', 'HEAD:main')
     commit = run('git', 'rev-parse', 'HEAD')
     if not release:
@@ -182,7 +185,7 @@ def publish():
                  "Built and tested automatically using system GTK/GLib/WebKitGTK. "
                  "Includes per-game Proton selection and Wayland-first integration.\n\n"
                  "SHA256SUMS covers the package, port sources and metadata. "
-                 "AppImage SHA256 is recorded in upstream.json and PKGBUILD.\n\n"
+                 "DEB SHA256 is recorded in upstream.json and PKGBUILD.\n\n"
                  "Install the downloaded package with `sudo pacman -U ./epic-games-launcher-proton-bin-*.pkg.tar.zst`. "
                  "User data and games are preserved.\n\n"
                  "<!-- aur-sync:start -->\nAUR: synchronization pending.\n<!-- aur-sync:end -->\n")
